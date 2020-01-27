@@ -67,4 +67,4 @@ def crps_scorer(estimator, x, y):
 
     crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - (1 / np.sqrt(np.pi)))
 
-    return np.mean(crps)
+    return -np.mean(crps)
