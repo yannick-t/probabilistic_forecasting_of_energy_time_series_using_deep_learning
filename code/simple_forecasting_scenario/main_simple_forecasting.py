@@ -1,16 +1,16 @@
-import pickle
-
-import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
-from skopt import BayesSearchCV
 from skopt.space import Real, Integer
 from skorch.callbacks import EarlyStopping
 
+from models.concrete_dropout import ConcreteDropoutNN
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from models.simple_nn import SimpleNN
+from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
+from training.loss.concrete_heteroscedastic_loss import ConcreteHeteroscedasticLoss
 from util.data.data_src_tools import load_opsd_de_load_daily
 from util.data.data_tools import convert_data_overlap
+from hyperparameter_opt.bayesian_optimization import bayesian_optimization, mse_scorer, crps_scorer
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
@@ -33,11 +33,38 @@ x_test, y_test = convert_data_overlap(dataset_test, num_prev_val, num_y=num_pred
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    simple_nn_bo()
+    concrete_bo()
+
+
+def concrete_bo():
+    concrete = ConcreteSkorch(module=ConcreteDropoutNN,
+                              module__input_size=x_train.shape[-1],
+                              module__output_size=y_train.shape[-1] * 2,
+                              lengthscale=1e-4,
+                              dataset_size=x_train.shape[0],
+                              sample_count=30,
+                              lr=0.001,
+                              max_epochs=20,
+                              optimizer=torch.optim.Adam,
+                              criterion=ConcreteHeteroscedasticLoss,
+                              device=device)
+
+    space = {
+        # 'lr': Real(0.01, 0.1, 'log-uniform'),
+        # 'max_epochs': Integer(50, 1000),
+        # 'batch_size': Integer(1000, 4000),
+        'module__hidden_size_0': Integer(64, 128),
+        'module__hidden_size_1': Integer(64, 128),
+        'module__hidden_size_2': Integer(12, 128),
+        'module__hidden_size_3': Integer(64, 128),
+        # 'module__hidden_size_4': Integer(1, 1024),
+        # 'module__hidden_size_5': Integer(1, 1024),
+    }
+
+    bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=64)
 
 
 def simple_nn_bo():
-    global counter
     # simle nn as comparison, optimize hyperparameters using bayesian optimization
     es = EarlyStopping(patience=200)
     simple_nn = BaseNNSkorch(module=SimpleNN,
@@ -49,44 +76,18 @@ def simple_nn_bo():
                              callbacks=[es],
                              verbose=0)
 
-    def scorer(estimator, X, y):
-        y_predicted = estimator.predict(X)
-        return -np.sqrt(np.mean((y - y_predicted) ** 2))
+    space = {'lr': Real(0.01, 0.1, 'log-uniform'),
+             'max_epochs': Integer(50, 1000),
+             'batch_size': Integer(1000, 4000),
+             'module__hidden_size_0': Integer(16, 1024),
+             'module__hidden_size_1': Integer(16, 1024),
+             'module__hidden_size_2': Integer(1, 1024),
+             # 'module__hidden_size_3': Integer(1, 1024),
+             # 'module__hidden_size_4': Integer(1, 1024),
+             # 'module__hidden_size_5': Integer(1, 1024),
+             }
 
-    opt = BayesSearchCV(
-        simple_nn,
-        {'lr': Real(0.01, 0.1, 'log-uniform'),
-         'max_epochs': Integer(50, 1000),
-         'batch_size': Integer(1000, 4000),
-         'module__hidden_size_0': Integer(16, 1024),
-         'module__hidden_size_1': Integer(16, 1024),
-         'module__hidden_size_2': Integer(1, 1024),
-         # 'module__hidden_size_3': Integer(1, 1024),
-         # 'module__hidden_size_4': Integer(1, 1024),
-         # 'module__hidden_size_5': Integer(1, 1024),
-         },
-        scoring=scorer,
-        n_iter=100,
-        cv=3,
-        verbose=10,
-        n_jobs=3)
-
-    counter = 0
-
-    # callback handler
-    def on_step(optim_result):
-        global counter
-        score = opt.best_score_
-        print(opt.best_params_)
-        print("best score: %s" % score)
-        print('counter: %d' % counter)
-        counter = counter + 1
-
-    opt.fit(x_train, y_train, callback=on_step)
-
-    print(opt.best_params_)
-    print("val. score: %s" % opt.best_score_)
-    print("test score: %s" % opt.score(x_test, y_test))
+    bayesian_optimization(simple_nn, space, mse_scorer, x_train, y_train, x_test, y_test)
 
 
 main()
