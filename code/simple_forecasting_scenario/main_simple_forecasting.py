@@ -37,11 +37,12 @@ def main():
 
 
 def concrete_bo():
+    cv = 3
     concrete = ConcreteSkorch(module=ConcreteDropoutNN,
                               module__input_size=x_train.shape[-1],
                               module__output_size=y_train.shape[-1] * 2,
                               lengthscale=1e-4,
-                              dataset_size=x_train.shape[0],
+                              dataset_size=int((1 - 1 / cv) * x_train.shape[0]),
                               sample_count=30,
                               lr=0.001,
                               max_epochs=20,
@@ -61,7 +62,7 @@ def concrete_bo():
         # 'module__hidden_size_5': Integer(1, 1024),
     }
 
-    bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=64)
+    bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=64, cv=cv)
 
 
 def simple_nn_bo():
