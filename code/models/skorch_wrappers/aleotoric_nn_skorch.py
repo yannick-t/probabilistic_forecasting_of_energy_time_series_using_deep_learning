@@ -18,23 +18,30 @@ class AleotoricNNSkorch(BaseNNSkorch):
 
         output_size = self.module__output_size
         assert output_size % 2 == 0
-        dxy = np.zeros((X.shape[0], self.sample_count, output_size))
+        dxy = torch.zeros((X.shape[0], self.sample_count, output_size))
 
         with torch.no_grad():
             for j in range(self.sample_count):
-                dxy[:, j] = to_numpy(self.predict_proba(to_tensor(X, device=self.device)))
+                dxy[:, j] = to_tensor(self.predict_proba(to_tensor(X, device=self.device)), self.device)
 
         # assuming network predicts mean and std of aleotoric uncertainty
         # first mean of all output dims then std of all output dims
         # to be used with Heteroscedastic loss class
         # combined mean
         outut_dim = int(output_size / 2)
-        mean = dxy[..., :outut_dim].mean(axis=1)
+        mean = dxy[..., :outut_dim].mean(dim=1)
+
+        # use sigmoid to be numerically stable and not depend on activation functions of nn
+        aleo_sampled = torch.sigmoid(dxy[..., outut_dim:])
+
         # combined approx variance from paper
         # "What Uncertainties Do We Need in Bayesian Deep Learning for Computer Vision?"
-        var = (dxy[..., :outut_dim]**2).mean(axis=1) - mean**2 + (dxy[..., outut_dim:]**2).mean(axis=1)
+        var = (dxy[..., :outut_dim]**2).mean(dim=1) - mean**2 + (aleo_sampled**2).mean(dim=1)
 
-        epistemic_std = dxy[..., :outut_dim].std(axis=1)
-        aleotoric_std = np.mean(dxy[..., outut_dim:], 1)
+        epistemic_std = dxy[..., :outut_dim].std(dim=1)
+        aleotoric_std = aleo_sampled.mean(dim=1)
 
-        return np.stack([mean, var, epistemic_std, aleotoric_std], -1)
+        if torch.isnan(mean).any():
+            print(mean)
+
+        return np.stack([to_numpy(mean), to_numpy(var), to_numpy(epistemic_std), to_numpy(aleotoric_std)], -1)

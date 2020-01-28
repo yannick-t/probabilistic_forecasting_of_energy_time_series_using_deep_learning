@@ -37,7 +37,7 @@ def main():
 
 
 def concrete_bo():
-    cv = 3
+    cv = 6
     concrete = ConcreteSkorch(module=ConcreteDropoutNN,
                               module__input_size=x_train.shape[-1],
                               module__output_size=y_train.shape[-1] * 2,
@@ -45,24 +45,26 @@ def concrete_bo():
                               dataset_size=int((1 - 1 / cv) * x_train.shape[0]),
                               sample_count=30,
                               lr=0.001,
-                              max_epochs=20,
+                              max_epochs=1500,
+                              batch_size=1024,
                               optimizer=torch.optim.Adam,
                               criterion=ConcreteHeteroscedasticLoss,
-                              device=device)
+                              device=device,
+                              verbose=0)
 
     space = {
-        # 'lr': Real(0.01, 0.1, 'log-uniform'),
+        'lr': Real(0.001, 0.04, 'log-uniform'),
         # 'max_epochs': Integer(50, 1000),
         # 'batch_size': Integer(1000, 4000),
         'module__hidden_size_0': Integer(64, 128),
         'module__hidden_size_1': Integer(64, 128),
         'module__hidden_size_2': Integer(12, 128),
-        'module__hidden_size_3': Integer(64, 128),
+        'module__hidden_size_3': Integer(1, 128),
         # 'module__hidden_size_4': Integer(1, 1024),
         # 'module__hidden_size_5': Integer(1, 1024),
     }
 
-    bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=64, cv=cv)
+    bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=512, cv=cv)
 
 
 def simple_nn_bo():
@@ -75,7 +77,7 @@ def simple_nn_bo():
                              criterion=torch.nn.MSELoss,
                              device=device,
                              callbacks=[es],
-                             verbose=0)
+                             verbose=1)
 
     space = {'lr': Real(0.01, 0.1, 'log-uniform'),
              'max_epochs': Integer(50, 1000),

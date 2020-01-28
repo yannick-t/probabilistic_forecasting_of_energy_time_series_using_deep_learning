@@ -67,4 +67,9 @@ def crps_scorer(estimator, x, y):
 
     crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - (1 / np.sqrt(np.pi)))
 
+    if np.any(np.isnan(crps)):
+        print(crps)
+
+    assert not np.any(np.isnan(crps))
+
     return -np.mean(crps)

@@ -21,8 +21,14 @@ class HeteroscedasticLoss(nn.Module):
         mean = preds[:, :outut_dim]
         std = preds[:, outut_dim:]
 
+        # use sigmoid to be numerically stable and not depend on activation functions of nn
+        std = torch.sigmoid(std)
+
         # bayesian nll
         dist = Normal(mean, std)
         loss = (-dist.log_prob(target)).mean()
+
+        if (loss > 1000).any():
+            print(loss)
 
         return loss

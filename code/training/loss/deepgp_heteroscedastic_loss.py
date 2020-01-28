@@ -20,7 +20,7 @@ class DeepGPHeteroscedasticLoss(nn.Module):
         mean = preds.mean[..., :outut_dim]
         std = preds.mean[..., outut_dim:]
 
-        std = torch.nn.functional.sigmoid(std)
+        std = torch.sigmoid(std)
 
         # bayesian ll
         dist = Normal(mean, std)

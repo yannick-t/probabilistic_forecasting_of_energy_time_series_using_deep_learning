@@ -60,6 +60,7 @@ class ConcreteDropout(nn.Module):
         dropout_regularizer *= self.dropout_regularizer * input_dimensionality
 
         regularization = weights_regularizer + dropout_regularizer
+
         return out, regularization
 
     def _concrete_dropout(self, x, p):
@@ -98,19 +99,23 @@ class ConcreteDropoutNN(BaseNN):
 
         self.act = nn.ReLU()
 
-        nn.init.xavier_uniform_(self.linear1.weight)
-        for fc in self.linears:
-            nn.init.xavier_uniform_(fc.weight)
+        # nn.init.xavier_uniform_(self.linear1.weight)
+        # for fc in self.linears:
+        #     nn.init.xavier_uniform_(fc.weight)
 
     def forward(self, x):
         regularization = torch.empty(len(self.hidden_size), device=x.device)
 
+        out_arr = []
+
         out, regularization[0] = self.conc_drops[0](x, nn.Sequential(self.linear1, self.act))
+        out_arr.append(out)
         for i in range(len(self.hidden_size) - 1):
             if i == len(self.hidden_size) - 2:
-                act = nn.Sigmoid()
+                act = nn.Identity()
             else:
                 act = self.act
             out, regularization[i + 1] = self.conc_drops[i + 1](out, nn.Sequential(self.linears[i], act))
+            out_arr.append(out)
 
         return out, regularization.sum()
