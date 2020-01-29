@@ -4,15 +4,16 @@ import matplotlib.pyplot as plt
 
 from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_gp import DeepGaussianProcess
+from models.functional_np import RegressionFNP
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
+from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from training.loss.concrete_heteroscedastic_loss import ConcreteHeteroscedasticLoss
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
 
 device = torch.device('cuda' if use_cuda else 'cpu')
-torch.set_default_tensor_type('torch.' + ('cuda.' if use_cuda else '') + 'DoubleTensor')
 
 f = lambda x: 1 / 8 * (np.sin(2 * (x + 0.1)) + 4)
 dx = np.arange(0.5, 4.5, 0.001)
@@ -35,7 +36,33 @@ x_test = np.expand_dims(dx_test, 1)
 # some code to test the combined uncertainty estimates of the models
 # on a toy problem and visualizing results
 def main():
-    concrete_dropout()
+    functional_np()
+
+
+def functional_np():
+    fnp = RegressionFNPSkorch(
+        module=RegressionFNP,
+        module__dim_x=x_train.shape[-1],
+        module__dim_y=y_train.shape[-1],
+        module__hidden_size=[20],
+        module__dim_u=3,
+        module__dim_z=50,
+        module__fb_z=1.0,
+        optimizer=torch.optim.Adam,
+        device=device,
+        max_epochs=200,
+        batch_size=1024,
+        reference_set_size=300,
+        train_size=x_train.size)
+
+    fnp.fit(x_train, y_train)
+
+    pred_mean, pred_std = fnp.predict(x_test)
+
+    # plot data
+    ax = plt.subplot(1, 1, 1)
+    plot(obs_aleo_x, obs_aleo_het_y, dx_test, pred_mean, pred_std, dx, dy, ax)
+    plt.show()
 
 
 def concrete_dropout():
