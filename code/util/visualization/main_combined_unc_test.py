@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+from numpy.distutils.command.config_compiler import config_cc
 
 from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_gp import DeepGaussianProcess
@@ -36,7 +37,7 @@ x_test = np.expand_dims(dx_test, 1)
 # some code to test the combined uncertainty estimates of the models
 # on a toy problem and visualizing results
 def main():
-    functional_np()
+    concrete_dropout()
 
 
 def functional_np():

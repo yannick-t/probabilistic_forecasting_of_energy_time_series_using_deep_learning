@@ -8,10 +8,21 @@ from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 # helper class to wrap the fnp implementation using skorch
 # taking into account reference set for fnp
 class RegressionFNPSkorch(BaseNNSkorch):
-    def __init__(self, reference_set_size, train_size, *args, **kwargs):
-        self.reference_set_size = reference_set_size
-        kwargs['module__num_M'] = train_size-reference_set_size
-        super().__init__(criterion=IdentityLoss, *args, **kwargs)
+    def __init__(self, train_size, reference_set_size_ratio=0.1, *args, **kwargs):
+        self.train_size = train_size
+        self.reference_set_size_ratio = reference_set_size_ratio
+        if 'module__num_M' not in kwargs:
+            self.calc_params()
+        
+        kwargs['criterion'] = IdentityLoss
+        super().__init__(*args, **kwargs)
+        
+    def calc_params(self):
+        self.module__num_M = self.train_size - int(self.reference_set_size_ratio * self.train_size)
+
+    def initialize_module(self):
+        self.calc_params()
+        super(RegressionFNPSkorch, self).initialize_module()
 
     def predict(self, X):
         self.module_.eval()
@@ -40,7 +51,7 @@ class RegressionFNPSkorch(BaseNNSkorch):
     def fit(self, X, y=None, **fit_params):
         # reference set and m
         idx = np.arange(X.shape[0])
-        idx_r = np.random.choice(idx, size=(self.reference_set_size,), replace=False)
+        idx_r = np.random.choice(idx, size=(int(self.reference_set_size_ratio * X.shape[0]),), replace=False)
         idx_m = np.array([i for i in np.arange(X.shape[0]) if i not in idx_r])
         self.xR, self.yR = to_tensor(X[idx_r], device=self.device), to_tensor(y[idx_r], device=self.device)
         x_m, y_m = X[idx_m], y[idx_m]

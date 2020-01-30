@@ -6,7 +6,7 @@ counter = 0
 opt = None
 
 
-def bayesian_optimization(model, space, scorer, x_train, y_train, x_test, y_test, n_iter=256, cv=3, n_jobs=None):
+def bayesian_optimization(model, space, scorer, x_train, y_train, x_test, y_test, n_iter=256, cv=5, n_jobs=None):
     global counter
     global opt
 
@@ -66,9 +66,6 @@ def crps_scorer(estimator, x, y):
     cdf = normal.cdf(sx)
 
     crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - (1 / np.sqrt(np.pi)))
-
-    if np.any(np.isnan(crps)):
-        print(crps)
 
     assert not np.any(np.isnan(crps))
 

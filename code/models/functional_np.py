@@ -58,8 +58,8 @@ class RegressionFNP(BaseNN):
         self.dim_y = dim_y
         self.dim_h = self.hidden_size[-1]
         n_layers = len(self.hidden_size)
-        self.dim_u = dim_u
-        self.dim_z = dim_z
+        self.dim_u = int(dim_u) # workaround for skopt
+        self.dim_z = int(dim_z) # workaround for skopt
         self.use_plus = use_plus
         self.fb_z = fb_z
         self.transf_y = transf_y
