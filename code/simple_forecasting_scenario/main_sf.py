@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import torch
 from sklearn.model_selection import train_test_split
 
-from evaluation.calibration import probabilistic_calibration
+from evaluation.calibration import probabilistic_calibration, interval_coverage, marginal_calibration
 from models.concrete_dropout import ConcreteDropoutNN
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from training.loss.concrete_heteroscedastic_loss import ConcreteHeteroscedasticLoss
@@ -37,7 +37,7 @@ def main():
 
 
 def concrete():
-    load_saved = False
+    load_saved = True
     model_name = 'concrete'
     model_file = model_folder + model_prefix + model_name
 
@@ -69,6 +69,13 @@ def concrete():
 
     probabilistic_calibration(pred_y[..., 0], pred_y[..., 1], y_test)
     probabilistic_calibration(pred_y_full[..., 0], pred_y_full[..., 1], y_full)
+    marginal_calibration(pred_y_full[..., 0], pred_y_full[..., 1], y_full)
+
+    cov = interval_coverage(pred_y_full[..., 0], pred_y_full[..., 1], y_full, 0.9)
+    print('0.9 interval coverage: %s' % cov)
+
+    cov = interval_coverage(pred_y_full[..., 0], pred_y_full[..., 1], y_full, 0.5)
+    print('0.5 interval coverage: %s' % cov)
 
 
 main()

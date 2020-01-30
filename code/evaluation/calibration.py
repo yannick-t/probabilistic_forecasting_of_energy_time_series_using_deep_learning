@@ -19,6 +19,7 @@ def pit_sanity_check():
 
 
 def probabilistic_calibration(pred_y_mean, pred_y_var, y_true):
+    # evaluate probabilistic calibration with PIT histogram
     default_plt_style(plt)
     n_bins = 20
 
@@ -27,7 +28,6 @@ def probabilistic_calibration(pred_y_mean, pred_y_var, y_true):
     y = torch.Tensor(y_true).cpu()
 
     dist = Normal(mean, var.sqrt())
-    # dist = Normal(torch.Tensor([0]).repeat(10000), torch.Tensor([2]).repeat(10000))
     pt = dist.cdf(y)
 
     ax = plt.subplot(1, 1, 1)
@@ -36,5 +36,42 @@ def probabilistic_calibration(pred_y_mean, pred_y_var, y_true):
     pt = pt.squeeze().numpy()
 
     ax.hist(pt, n_bins, color='lightblue', density=True, weights=np.zeros_like(pt) + 1. / pt.size)
+
+    plt.show()
+
+
+def interval_coverage(pred_y_mean, pred_y_var, y_true, interval):
+    # "the proportion of the time that the interval contains the true value of interest"
+    mean = torch.Tensor(pred_y_mean).cpu()
+    var = torch.Tensor(pred_y_var).cpu()
+    y = torch.Tensor(y_true).cpu()
+
+    dist = Normal(mean, var.sqrt())
+    cov = dist.cdf(y) <= interval
+    cov = cov.sum() / float(cov.shape[0])
+
+    return cov.numpy()
+
+
+def marginal_calibration(pred_y_mean, pred_y_var, y_true):
+    default_plt_style(plt)
+
+    mean = torch.Tensor(pred_y_mean).cpu().squeeze()
+    var = torch.Tensor(pred_y_var).cpu().squeeze()
+    y = torch.Tensor(y_true).cpu().squeeze()
+
+    dist = Normal(mean, var.sqrt())
+
+    emp_cdf = lambda x: (y <= x.unsqueeze(-1)).double().mean(-1)
+    avg_pred_cdf = lambda x: dist.cdf(x.unsqueeze(-1)).mean(-1)
+
+    plt_x = torch.arange(-0.2, 1.2, 0.01)
+
+    dif = avg_pred_cdf(plt_x) - emp_cdf(plt_x)
+
+    ax = plt.subplot(1, 1, 1)
+    default_fig_style(ax)
+
+    ax.plot(plt_x, dif, color='lightblue')
 
     plt.show()
