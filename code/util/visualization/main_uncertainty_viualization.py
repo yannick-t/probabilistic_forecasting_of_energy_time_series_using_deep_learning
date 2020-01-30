@@ -5,6 +5,7 @@ import torch
 
 from models.simple_gp import ExactGPModel
 from training.training_gp import train_exact_gp
+from util.visualization.plt_styling import default_fig_style, default_plt_style
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -14,7 +15,7 @@ def main():
 
     # plot styling
     fig = plt.figure()
-    plt.style.use('seaborn-whitegrid')
+    default_plt_style(plt)
     plt.locator_params(axis='y', nbins=4)
     plt.locator_params(axis='x', nbins=6)
 
@@ -80,8 +81,7 @@ def main():
 
 def plot(obs_x, obs_y, pred_means, pred_stds, dx, dy, ax):
     # some styling
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+    default_fig_style(ax)
     ax.margins(0, 0.06)
     # ax.set_yticklabels([])
     # ax.set_xticklabels([])

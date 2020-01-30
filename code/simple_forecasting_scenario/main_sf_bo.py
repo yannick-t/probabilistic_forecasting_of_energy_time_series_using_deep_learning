@@ -77,6 +77,7 @@ def concrete_bo():
                               dataset_size=int((1 - 1 / cv) * x_train.shape[0]),
                               sample_count=30,
                               lr=0.001,
+                              train_split=None,
                               max_epochs=2000,
                               batch_size=1024,
                               optimizer=torch.optim.Adam,
