@@ -28,5 +28,9 @@ class ConcreteSkorch(AleotoricNNSkorch):
         self.calc_params()
         super(ConcreteSkorch, self).initialize_module()
 
+    def get_loss(self, y_pred, y_true, X=None, training=False):
+        # add regularization that concrete dropout returns to loss
+        return super(ConcreteSkorch, self).get_loss(y_pred[0], y_true, X, training) + y_pred[1]
+
 
 

@@ -1,11 +1,13 @@
 import torch
 from torch import nn
+import numpy as np
 from torch.distributions import Normal
 
 
-class HeteroscedasticLoss(nn.Module):
+class CRPSLoss(nn.Module):
     def __init__(self):
         super().__init__()
+        self.const = (1 / torch.Tensor([np.pi]).sqrt())
 
     def forward(self, preds, target):
         assert not target.requires_grad
@@ -16,17 +18,19 @@ class HeteroscedasticLoss(nn.Module):
         # first mean of all output dims then var of all output dims
 
         outut_dim = int(preds.shape[-1] / 2)
-        mean = preds[:, :outut_dim]
-        std = preds[:, outut_dim:]
+        mu = preds[:, :outut_dim]
+        sigma = preds[:, outut_dim:]
 
         # use sigmoid to be numerically stable and not depend on activation functions of nn
-        std = torch.sigmoid(std)
+        sigma = torch.sigmoid(sigma)
 
-        # bayesian nll
-        dist = Normal(mean, std)
-        loss = (-dist.log_prob(target)).mean()
+        # crps
+        sx = (target - mu) / sigma
 
-        if (loss > 1000).any():
-            print(loss)
+        normal = Normal(0, 1)
+        pdf = normal.log_prob(sx).exp()
+        cdf = normal.cdf(sx)
 
-        return loss
+        crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - self.const)
+
+        return crps.mean()

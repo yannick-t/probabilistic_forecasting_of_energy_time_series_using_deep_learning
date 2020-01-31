@@ -9,7 +9,8 @@ from models.functional_np import RegressionFNP
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
-from training.loss.concrete_heteroscedastic_loss import ConcreteHeteroscedasticLoss
+from training.loss.crps_loss import CRPSLoss
+from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
@@ -24,7 +25,7 @@ dy = f(dx)
 obs_aleo_x = np.arange(0.6, 2.5, 0.1)
 
 aleo_het_stds_f = lambda x: 1 / 30 * (np.sin(1.5 * x) + 1.2)
-obs_aleo_het_y = np.random.normal(f(obs_aleo_x), aleo_het_stds_f(obs_aleo_x), [100, obs_aleo_x.size]).transpose()
+obs_aleo_het_y = np.random.normal(f(obs_aleo_x), aleo_het_stds_f(obs_aleo_x), [30, obs_aleo_x.size]).transpose()
 aleo_het_stds = aleo_het_stds_f(dx)
 
 # train model on observation
@@ -80,7 +81,7 @@ def concrete_dropout():
         max_epochs=1000,
         batch_size=1024,
         optimizer=torch.optim.Adam,
-        criterion=ConcreteHeteroscedasticLoss,
+        criterion=CRPSLoss,
         device=device,
         verbose=1
     )

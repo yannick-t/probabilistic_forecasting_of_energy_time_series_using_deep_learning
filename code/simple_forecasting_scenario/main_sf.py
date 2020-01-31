@@ -7,7 +7,8 @@ from sklearn.model_selection import train_test_split
 from evaluation.calibration import probabilistic_calibration, interval_coverage, marginal_calibration
 from models.concrete_dropout import ConcreteDropoutNN
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
-from training.loss.concrete_heteroscedastic_loss import ConcreteHeteroscedasticLoss
+from training.loss.crps_loss import CRPSLoss
+from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 from util.data.data_src_tools import prepare_opsd_de_daily, load_opsd_de_load_daily
 from util.data.data_tools import convert_data_overlap
 
@@ -39,7 +40,6 @@ def main():
 def concrete():
     load_saved = True
     model_name = 'concrete'
-    model_file = model_folder + model_prefix + model_name
 
     concrete_model = ConcreteSkorch(module=ConcreteDropoutNN,
                                     module__input_size=x_train.shape[-1],
@@ -53,19 +53,25 @@ def concrete():
                                     max_epochs=1000,
                                     batch_size=1024,
                                     optimizer=torch.optim.Adam,
-                                    criterion=ConcreteHeteroscedasticLoss,
+                                    criterion=CRPSLoss,
                                     device=device,
                                     verbose=1)
 
-    if os.path.isfile(model_file) & load_saved:
-        concrete_model.initialize()
-        concrete_model.load_params(model_file)
-    else:
-        concrete_model.fit(x_train, y_train)
-        concrete_model.save_params(model_file)
+    evaluate(concrete_model, model_name, load_saved)
 
-    pred_y = concrete_model.predict(x_test)
-    pred_y_full = concrete_model.predict(x_full)
+
+def evaluate(model, model_name, load_saved):
+    model_file = model_folder + model_prefix + model_name
+
+    if os.path.isfile(model_file) & load_saved:
+        model.initialize()
+        model.load_params(model_file)
+    else:
+        model.fit(x_train, y_train)
+        model.save_params(model_file)
+
+    pred_y = model.predict(x_test)
+    pred_y_full = model.predict(x_full)
 
     probabilistic_calibration(pred_y[..., 0], pred_y[..., 1], y_test)
     probabilistic_calibration(pred_y_full[..., 0], pred_y_full[..., 1], y_full)

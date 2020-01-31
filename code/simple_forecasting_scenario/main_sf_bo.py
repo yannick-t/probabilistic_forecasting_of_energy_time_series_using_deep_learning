@@ -11,6 +11,7 @@ from models.simple_nn import SimpleNN
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from training.loss.concrete_heteroscedastic_loss import ConcreteHeteroscedasticLoss
+from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 from util.data.data_src_tools import load_opsd_de_load_daily
 from util.data.data_tools import convert_data_overlap
 from hyperparameter_opt.bayesian_optimization import bayesian_optimization, mse_scorer, crps_scorer
@@ -81,7 +82,7 @@ def concrete_bo():
                               max_epochs=2000,
                               batch_size=1024,
                               optimizer=torch.optim.Adam,
-                              criterion=ConcreteHeteroscedasticLoss,
+                              criterion=HeteroscedasticLoss,
                               device=device,
                               verbose=0)
 
