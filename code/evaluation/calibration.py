@@ -18,26 +18,24 @@ def pit_sanity_check():
     probabilistic_calibration(mu, real_sigma**2, obs)
 
 
-def probabilistic_calibration(pred_y_mean, pred_y_var, y_true):
+def probabilistic_calibration(pred_y_mean, pred_y_var, y_true, ax):
+    ax.set_title('Probabilistic Calibration: Probability Integral Transform Histogram')
+
     # evaluate probabilistic calibration with PIT histogram
-    default_plt_style(plt)
     n_bins = 20
 
-    mean = torch.Tensor(pred_y_mean).cpu()
-    var = torch.Tensor(pred_y_var).cpu()
-    y = torch.Tensor(y_true).cpu()
+    mean = torch.Tensor(pred_y_mean).cpu().squeeze()
+    var = torch.Tensor(pred_y_var).cpu().squeeze()
+    y = torch.Tensor(y_true).cpu().squeeze()
 
     dist = Normal(mean, var.sqrt())
     pt = dist.cdf(y)
 
-    ax = plt.subplot(1, 1, 1)
-    default_fig_style(ax)
-
     pt = pt.squeeze().numpy()
 
     ax.hist(pt, n_bins, color='lightblue', density=True, weights=np.zeros_like(pt) + 1. / pt.size)
-
-    plt.show()
+    ax.set_ylabel('Relative Frequency')
+    ax.margins(0, 0.06)
 
 
 def interval_coverage(pred_y_mean, pred_y_var, y_true, interval):
@@ -53,7 +51,9 @@ def interval_coverage(pred_y_mean, pred_y_var, y_true, interval):
     return cov.numpy()
 
 
-def marginal_calibration(pred_y_mean, pred_y_var, y_true):
+def marginal_calibration(pred_y_mean, pred_y_var, y_true, ax):
+    ax.set_title('Marginal Calibration: Difference between empirical CDF and average predictive CDF')
+
     default_plt_style(plt)
 
     mean = torch.Tensor(pred_y_mean).cpu().squeeze()
@@ -62,6 +62,10 @@ def marginal_calibration(pred_y_mean, pred_y_var, y_true):
 
     dist = Normal(mean, var.sqrt())
 
+    # calc and display difference of empirical cdf an avg predictive cdf (like in
+    # "Gneiting, T., Balabdaoui, F., & Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness.
+    # Journal of the Royal Statistical Society: Series B (Statistical Methodology), 69(2), 243-268.")
+
     emp_cdf = lambda x: (y <= x.unsqueeze(-1)).double().mean(-1)
     avg_pred_cdf = lambda x: dist.cdf(x.unsqueeze(-1)).mean(-1)
 
@@ -69,9 +73,4 @@ def marginal_calibration(pred_y_mean, pred_y_var, y_true):
 
     dif = avg_pred_cdf(plt_x) - emp_cdf(plt_x)
 
-    ax = plt.subplot(1, 1, 1)
-    default_fig_style(ax)
-
     ax.plot(plt_x, dif, color='lightblue')
-
-    plt.show()
