@@ -35,7 +35,9 @@ class AleotoricNNSkorch(BaseNNSkorch):
         aleo_sampled = torch.sigmoid(dxy[..., outut_dim:])
 
         # combined approx variance from paper
-        # "What Uncertainties Do We Need in Bayesian Deep Learning for Computer Vision?"
+        # Kendall, A., & Gal, Y. (2017).
+        # What uncertainties do we need in bayesian deep learning for computer vision?.
+        # In Advances in neural information processing systems (pp. 5574-5584).
         var = (dxy[..., :outut_dim]**2).mean(dim=1) - mean**2 + (aleo_sampled**2).mean(dim=1)
 
         epistemic_std = dxy[..., :outut_dim].std(dim=1)

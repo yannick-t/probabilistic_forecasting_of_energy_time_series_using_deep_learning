@@ -5,7 +5,7 @@ import torch
 
 from models.simple_gp import ExactGPModel
 from training.training_gp import train_exact_gp
-from util.visualization.plt_styling import default_fig_style, default_plt_style
+from util.visualization.plotting import default_fig_style, default_plt_style
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

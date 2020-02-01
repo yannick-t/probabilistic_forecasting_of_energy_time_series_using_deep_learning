@@ -4,15 +4,16 @@ import matplotlib.pyplot as plt
 import torch
 from sklearn.model_selection import train_test_split
 
-from evaluation.calibration import probabilistic_calibration, interval_coverage, marginal_calibration
-from evaluation.sharpness import sharpness
+from evaluation.calibration import probabilistic_calibration, interval_coverage, marginal_calibration, \
+    probabilistic_calibration_multiple, marginal_calibration_multiple
+from evaluation.sharpness import sharpness_plot_multiple, sharpness_plot, sharpness_avg_width
 from models.concrete_dropout import ConcreteDropoutNN
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 from util.data.data_src_tools import prepare_opsd_de_daily, load_opsd_de_load_daily
 from util.data.data_tools import convert_data_overlap
-from util.visualization.plt_styling import default_plt_style
+from util.visualization.plotting import default_plt_style
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
@@ -59,21 +60,10 @@ def concrete():
                                     device=device,
                                     verbose=1)
 
-    load_train_evaluate(concrete_model, model_name, load_saved)
+    load_train(concrete_model, model_name, load_saved)
 
-
-def load_train_evaluate(model, model_name, load_saved):
-    model_file = model_folder + model_prefix + model_name
-
-    if os.path.isfile(model_file) & load_saved:
-        model.initialize()
-        model.load_params(model_file)
-    else:
-        model.fit(x_train, y_train)
-        model.save_params(model_file)
-
-    pred_y = model.predict(x_test)
-    pred_y_full = model.predict(x_full)
+    pred_y = concrete_model.predict(x_test)
+    pred_y_full = concrete_model.predict(x_full)
 
     pred_y_mean = pred_y[..., 0]
     pred_y_var = pred_y[..., 1]
@@ -84,13 +74,26 @@ def load_train_evaluate(model, model_name, load_saved):
     evaluate(pred_y_full_mean, pred_y_full_var, y_full)
 
 
+def load_train(model, model_name, load_saved):
+    model_file = model_folder + model_prefix + model_name
+
+    if os.path.isfile(model_file) & load_saved:
+        model.initialize()
+        model.load_params(model_file)
+    else:
+        model.fit(x_train, y_train)
+        model.save_params(model_file)
+
+
 def evaluate(pred_mean, pred_var, true_y):
     default_plt_style(plt)
 
     # calibration
     ax = plt.subplot(2, 2, 1)
+    ax.set_title('Probabilistic Calibration: Probability Integral Transform Histogram')
     probabilistic_calibration(pred_mean, pred_var, true_y, ax)
     ax = plt.subplot(2, 2, 2)
+    ax.set_title('Marginal Calibration: Difference between empirical CDF and average predictive CDF')
     marginal_calibration(pred_mean, pred_var, true_y, ax)
 
     # interval coverage
@@ -102,9 +105,13 @@ def evaluate(pred_mean, pred_var, true_y):
 
     # sharpness
     ax = plt.subplot(2, 2, 3)
-    avg_5, avg_9 = sharpness(pred_mean, pred_var, ax)
+    ax.set_title('Sharpness: Predictive Interval Width')
+    sharpness_plot(pred_var, ax)
+    avg_5, avg_9 = sharpness_avg_width(pred_var)
     print('Average central 50%% interval width: %.5f' % avg_5)
     print('Average central 90%% interval width: %.5f' % avg_9)
+
+    plt.show()
 
 
 main()
