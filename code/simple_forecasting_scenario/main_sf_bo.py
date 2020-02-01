@@ -10,7 +10,6 @@ from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from models.simple_nn import SimpleNN
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
-from training.loss.concrete_heteroscedastic_loss import ConcreteHeteroscedasticLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 from util.data.data_src_tools import load_opsd_de_load_daily
 from util.data.data_tools import convert_data_overlap
@@ -50,20 +49,22 @@ def fnp_bo():
         optimizer=torch.optim.Adam,
         device=device,
         batch_size=64,
-        train_size=int((1 - 1 / cv) * x_train.shape[0]))
+        train_size=int((1 - 1 / cv) * x_train.shape[0]),
+        verbose=0
+    )
 
     space = {
         'lr': Real(0.001, 0.04, 'log-uniform'),
-        'max_epochs': Integer(50, 400),
-        'batch_size': [16, 32, 64, 128],
+        'max_epochs': Integer(40, 220),
+        'batch_size': [64, 128, 256],
         'module__dim_u': Integer(1, 16),
         'module__dim_z': Integer(8, 128),
         'module__fb_z': Real(0, 4.0),
         'reference_set_size_ratio': Real(0.01, 0.4),
-        'module__hidden_size_0': Integer(64, 128),
-        'module__hidden_size_1': Integer(64, 128),
-        'module__hidden_size_2': Integer(12, 128),
-        'module__hidden_size_3': Integer(1, 128),
+        'module__hidden_size_0': Integer(64, 256),
+        'module__hidden_size_1': Integer(64, 512),
+        'module__hidden_size_2': Integer(12, 256),
+        'module__hidden_size_3': Integer(1, 256),
     }
 
     bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=512, cv=cv)

@@ -27,16 +27,19 @@ class RegressionFNPSkorch(BaseNNSkorch):
     def predict(self, X):
         self.module_.eval()
 
+        output_size = self.module__dim_y
         samples = 30
-        dxy = np.zeros((X.shape[0], samples))
+        dxy = np.zeros((X.shape[0], samples, output_size))
 
         with torch.no_grad():
             for j in range(samples):
-                dxy[:, j] = to_numpy(self.module_.predict(to_tensor(X, device=self.device), self.xR, self.yR).squeeze(1))
+                dxy[:, j] = to_numpy(self.module_.predict(to_tensor(X, device=self.device), self.xR, self.yR))
 
-        mean_dxy, std_dxy = dxy.mean(axis=1), dxy.std(axis=1)
+        mean, var = dxy.mean(axis=1), dxy.var(axis=1)
 
-        return mean_dxy, std_dxy
+        r = np.stack([mean, var], -1)
+
+        return r
 
     def infer(self, x, **fit_params):
         x = to_tensor(x, device=self.device)
