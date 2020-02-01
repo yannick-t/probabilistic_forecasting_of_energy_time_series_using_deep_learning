@@ -47,7 +47,7 @@ def sharpness_plot_(pred_y_var, ax, names=None):
     if names is not None:
         ax.set_xticklabels(np.concatenate([[name + ' 50%', name + ' 90%'] for name in names]))
     else:
-        ax.set_xticklabels(np.concatenate([['50%', '90%'] for name in names]))
+        ax.set_xticklabels(['50%', '90%'])
 
 
 def sharpness_avg_width(pred_var):

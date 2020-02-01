@@ -25,12 +25,20 @@ class CRPSLoss(nn.Module):
         sigma = torch.sigmoid(sigma)
 
         # crps
+        # Gneiting, T., Raftery, A. E., Westveld III, A. H., & Goldman, T. (2005).
+        # Calibrated probabilistic forecasting using ensemble model output statistics and minimum CRPS estimation.
+        # Monthly Weather Review, 133(5), 1098-1118.
+        # Formula 5
         sx = (target - mu) / sigma
 
         normal = Normal(0, 1)
         pdf = normal.log_prob(sx).exp()
         cdf = normal.cdf(sx)
 
+        assert pdf.shape == cdf.shape == sx.shape == target.shape
+
         crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - self.const)
 
-        return crps.mean()
+        assert crps.shape == target.shape
+
+        return crps.mean(0)

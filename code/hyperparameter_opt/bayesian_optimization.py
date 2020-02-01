@@ -2,6 +2,8 @@ from skopt import BayesSearchCV
 import numpy as np
 from scipy.stats import multivariate_normal
 
+from evaluation.scoring import crps
+
 counter = 0
 opt = None
 
@@ -59,14 +61,6 @@ def crps_scorer(estimator, x, y):
     mu = y_predicted[..., 0]
     sigma = np.sqrt(y_predicted[..., 1])
 
-    sx = (y - mu) / sigma
+    score = crps(mu, sigma, y)
 
-    normal = multivariate_normal(0, 1)
-    pdf = normal.pdf(sx)
-    cdf = normal.cdf(sx)
-
-    crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - (1 / np.sqrt(np.pi)))
-
-    assert not np.any(np.isnan(crps))
-
-    return -np.mean(crps)
+    return -score
