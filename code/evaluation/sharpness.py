@@ -15,11 +15,11 @@ def sharpness_plot_multiple(names, pred_y_var):
     plt.show()
 
 
-def sharpness_plot(pred_y_var, ax):
-    sharpness_plot_([pred_y_var], ax)
+def sharpness_plot(pred_y_var, ax, scaler=None):
+    sharpness_plot_([pred_y_var], ax, scaler=scaler)
 
 
-def sharpness_plot_(pred_y_var, ax, names=None):
+def sharpness_plot_(pred_y_var, ax, names=None, scaler=None):
     q_5 = np.sqrt(2) * erfinv(0.5)
     q_9 = np.sqrt(2) * erfinv(0.9)
 
@@ -37,8 +37,12 @@ def sharpness_plot_(pred_y_var, ax, names=None):
         # display 5, 25, 50, 75, 95 percentile / quantile to assess sharpness in a heteroscedastic scenario (like in
         # "Gneiting, T., Balabdaoui, F., & Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness.
         # Journal of the Royal Statistical Society: Series B (Statistical Methodology), 69(2), 243-268.")
-        quantiles_5 = np.quantile(widths_5.squeeze(), [0.05, 0.25, 0.5, 0.75, 0.95], axis=-1)
-        quantiles_9 = np.quantile(widths_9.squeeze(), [0.05, 0.25, 0.5, 0.75, 0.95], axis=-1)
+        quantiles_5 = np.quantile(widths_5, [0.05, 0.25, 0.5, 0.75, 0.95], axis=-2)
+        quantiles_9 = np.quantile(widths_9, [0.05, 0.25, 0.5, 0.75, 0.95], axis=-2)
+
+        if scaler is not None:
+            quantiles_5 = scaler.inverse_transform(quantiles_5).squeeze()
+            quantiles_9 = scaler.inverse_transform(quantiles_9).squeeze()
 
         quantiles[(counter * 2)] = quantiles_5
         quantiles[(counter * 2) + 1] = quantiles_9

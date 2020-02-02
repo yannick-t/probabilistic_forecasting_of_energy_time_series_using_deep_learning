@@ -1,9 +1,7 @@
-from math import nan
-
 import pandas
-import torch
-from numpy import float32
+import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 from util.data.data_tools import convert_data_overlap
 
@@ -27,19 +25,17 @@ def load_opsd_de_load_daily():
     return dataset
 
 
-def prepare_opsd_de_daily(device, num_prev_val=7, num_pred_val=1, y_as_nx1=True):
-    # data
+def prepare_opsd_daily(num_prev_val, num_pred_val):
     dataset = load_opsd_de_load_daily()
-    dataset_normalized = (dataset - dataset.min()) / (dataset.max() - dataset.min())
-    dataset_train, dataset_test = train_test_split(dataset_normalized, test_size=0.1, shuffle=False)
+    scaler = MinMaxScaler()
+    dataset['DE_load_actual_entsoe_power_statistics'] = \
+        scaler.fit_transform(np.array(dataset['DE_load_actual_entsoe_power_statistics']).reshape(-1, 1)).squeeze()
 
-    # try to predict next value by last num_prev_val values
-    x_train, y_train = convert_data_overlap(dataset_train, num_prev_val, num_y=num_pred_val, y_as_nx1=y_as_nx1)
-    x_test, y_test = convert_data_overlap(dataset_test, num_prev_val, num_y=num_pred_val, y_as_nx1=y_as_nx1)
+    x_full, y_full = convert_data_overlap(dataset, num_prev_val, num_y=num_pred_val, y_as_nx1=True)
+    dataset_train, dataset_test = train_test_split(dataset, test_size=0.1, shuffle=True)
 
-    x_train_tensor = torch.tensor(x_train, device=device).double()
-    y_train_tensor = torch.tensor(y_train, device=device).double()
-    x_test_tensor = torch.tensor(x_test, device=device).double()
-    y_test_tensor = torch.tensor(y_test, device=device).double()
+    # predict next value by last num_prev_val values
+    x_train, y_train = convert_data_overlap(dataset_train, num_prev_val, num_y=num_pred_val, y_as_nx1=True)
+    x_test, y_test = convert_data_overlap(dataset_test, num_prev_val, num_y=num_pred_val, y_as_nx1=True)
 
-    return x_train_tensor, y_train_tensor, x_test_tensor, y_test_tensor
+    return x_full, y_full, x_train, y_train, x_test, y_test, scaler

@@ -28,6 +28,5 @@ class SimpleNN(BaseNN):
         out = torch.dropout(out, dropout_rate, True)
 
         out = self.fc2(out)
-        out = torch.sigmoid(out)
         return out
 
