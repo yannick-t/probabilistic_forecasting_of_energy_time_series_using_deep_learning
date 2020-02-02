@@ -3,8 +3,6 @@ import os
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
 from evaluation.calibration import probabilistic_calibration, interval_coverage, marginal_calibration, \
     probabilistic_calibration_multiple, marginal_calibration_multiple
@@ -13,8 +11,9 @@ from evaluation.sharpness import sharpness_plot_multiple, sharpness_plot, sharpn
 from models.concrete_dropout import ConcreteDropoutNN
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from training.loss.crps_loss import CRPSLoss
+from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 from util.data.data_src_tools import load_opsd_de_load_daily, prepare_opsd_daily
-from util.data.data_tools import convert_data_overlap
+from util.data.data_tools import convert_data_overlap, inverse_transform_normal
 from util.visualization.plotting import default_plt_style
 
 use_cuda = True
@@ -39,11 +38,17 @@ def main():
 
     pred_y_mean = pred_y[..., 0]
     pred_y_var = pred_y[..., 1]
+    pred_y_epis_var = pred_y[..., 2]**2
+    pred_y_aleo_var = pred_y[..., 3]**2
 
     pred_y_full_mean = pred_y_full[..., 0]
     pred_y_full_var = pred_y_full[..., 1]
 
-    evaluate(pred_y_mean, pred_y_var, y_test, scaler)
+    pred_y_mean, pred_y_std = inverse_transform_normal(pred_y_mean, np.sqrt(pred_y_var), scaler)
+    pred_y_var = pred_y_std**2
+    y_test = scaler.inverse_transform(y_test)
+
+    evaluate(pred_y_mean, pred_y_var, y_test)
 
 
 def concrete_init(x_train, y_train):
@@ -56,7 +61,7 @@ def concrete_init(x_train, y_train):
                                     sample_count=30,
                                     lr=0.001,
                                     train_split=None,
-                                    max_epochs=32,
+                                    max_epochs=1024,
                                     batch_size=1024,
                                     optimizer=torch.optim.Adam,
                                     criterion=CRPSLoss,
@@ -77,7 +82,7 @@ def load_train(model, x_train, y_train, model_name, load_saved):
         model.save_params(model_file)
 
 
-def evaluate(pred_mean, pred_var, true_y, scaler):
+def evaluate(pred_mean, pred_var, true_y):
     default_plt_style(plt)
 
     # calibration
@@ -98,19 +103,33 @@ def evaluate(pred_mean, pred_var, true_y, scaler):
     # sharpness
     ax = plt.subplot(2, 2, 3)
     ax.set_title('Sharpness: Predictive Interval Width')
-    sharpness_plot(pred_var, ax, scaler)
+    sharpness_plot(pred_var, ax,)
     avg_5, avg_9 = sharpness_avg_width(pred_var)
     print('Average central 50%% interval width: %.5f' % avg_5)
     print('Average central 90%% interval width: %.5f' % avg_9)
 
     # scoring
     print("RMSE: %.4f" % rmse(pred_mean, true_y))
-    # print("MAPE: %.2f" % mape(pred_mean, true_y))
-    print("MAPE: %.2f" % mape(scaler.inverse_transform(pred_mean), scaler.inverse_transform(true_y)))
+    print("MAPE: %.2f" % mape(pred_mean, true_y))
     print("CRPS: %.4f" % crps(pred_mean, np.sqrt(pred_var), true_y))
     print("Average LL: %.4f" % log_likelihood(pred_mean, np.sqrt(pred_var), true_y))
 
     plt.show()
+
+
+def plot_test_data(pred_mean, pred_var, y_true, ax):
+    x = np.array(range(pred_mean.shape[0]))
+
+    ax.plot(y_true.squeeze(), color='blue')
+    ax.plot(pred_mean.squeeze(), color='orange')
+
+    if pred_var is not None:
+        std_deviations = np.sqrt(pred_var.squeeze())
+
+        for j in range(1, 5):
+            ax.fill_between(x, pred_mean.squeeze() - j / 2 * std_deviations,
+                            pred_mean.squeeze() + j / 2 * std_deviations,
+                            alpha=0.1, color='orange')
 
 
 main()

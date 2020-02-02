@@ -41,11 +41,11 @@ def sharpness_plot_(pred_y_var, ax, names=None, scaler=None):
         quantiles_9 = np.quantile(widths_9, [0.05, 0.25, 0.5, 0.75, 0.95], axis=-2)
 
         if scaler is not None:
-            quantiles_5 = scaler.inverse_transform(quantiles_5).squeeze()
-            quantiles_9 = scaler.inverse_transform(quantiles_9).squeeze()
+            quantiles_5 = scaler.inverse_transform(quantiles_5)
+            quantiles_9 = scaler.inverse_transform(quantiles_9)
 
-        quantiles[(counter * 2)] = quantiles_5
-        quantiles[(counter * 2) + 1] = quantiles_9
+        quantiles[(counter * 2)] = quantiles_5.squeeze()
+        quantiles[(counter * 2) + 1] = quantiles_9.squeeze()
 
     ax.boxplot([q for q in quantiles])
     if names is not None:

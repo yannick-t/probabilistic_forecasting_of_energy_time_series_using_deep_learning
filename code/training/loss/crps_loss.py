@@ -31,13 +31,14 @@ class CRPSLoss(nn.Module):
         # Formula 5
         sx = (target - mu) / sigma
 
-        normal = Normal(0, 1)
+        normal = Normal(torch.Tensor([0]).to(preds.device),
+                        torch.Tensor([1]).to(preds.device))
         pdf = normal.log_prob(sx).exp()
         cdf = normal.cdf(sx)
 
         assert pdf.shape == cdf.shape == sx.shape == target.shape
 
-        crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - self.const)
+        crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - self.const.to(preds.device))
 
         assert crps.shape == target.shape
 

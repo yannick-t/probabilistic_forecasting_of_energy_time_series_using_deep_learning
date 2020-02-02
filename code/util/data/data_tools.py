@@ -22,3 +22,12 @@ def convert_data_overlap(data, n, num_y=1, y_as_nx1=True):
                 y_arr.append(data.iloc[i + n + 1:i + n + 1 + num_y, 0])
 
     return np.array(x_arr), np.array(y_arr)
+
+
+def inverse_transform_normal(mean, std, scaler):
+    # utility method to inverse transform normal distribution parameters
+    mean_transformed = scaler.inverse_transform(mean)
+    mean_std_transformed = scaler.inverse_transform(mean + std)
+    std_transformed = np.abs(mean_std_transformed - mean_transformed)
+
+    return mean_transformed, std_transformed

@@ -80,9 +80,15 @@ def marginal_calibration(pred_y_mean, pred_y_var, y_true, ax):
     emp_cdf = lambda x: (y <= x.unsqueeze(-1)).double().mean(-1)
     avg_pred_cdf = lambda x: dist.cdf(x.unsqueeze(-1)).mean(-1)
 
-    plt_x = torch.arange(-2, 2, 0.01)
+    min_x = y.min()
+    max_x = y.max()
+    step = (max_x - min_x) / 1000
+    plt_x = torch.arange(min_x, max_x, step)
 
-    dif = avg_pred_cdf(plt_x) - emp_cdf(plt_x)
+    pcdf = avg_pred_cdf(plt_x)
+    ecdf = emp_cdf(plt_x)
+
+    dif = pcdf - ecdf
 
     ax.plot(plt_x, dif, color='lightblue')
 

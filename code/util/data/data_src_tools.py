@@ -27,12 +27,13 @@ def load_opsd_de_load_daily():
 
 def prepare_opsd_daily(num_prev_val, num_pred_val):
     dataset = load_opsd_de_load_daily()
-    scaler = MinMaxScaler()
+    scaler = StandardScaler()
+    # scaler = MinMaxScaler()
     dataset['DE_load_actual_entsoe_power_statistics'] = \
         scaler.fit_transform(np.array(dataset['DE_load_actual_entsoe_power_statistics']).reshape(-1, 1)).squeeze()
 
     x_full, y_full = convert_data_overlap(dataset, num_prev_val, num_y=num_pred_val, y_as_nx1=True)
-    dataset_train, dataset_test = train_test_split(dataset, test_size=0.1, shuffle=True)
+    dataset_train, dataset_test = train_test_split(dataset, test_size=0.1, shuffle=False)
 
     # predict next value by last num_prev_val values
     x_train, y_train = convert_data_overlap(dataset_train, num_prev_val, num_y=num_pred_val, y_as_nx1=True)
