@@ -17,7 +17,7 @@ use_cuda = use_cuda & torch.cuda.is_available()
 
 device = torch.device('cuda' if use_cuda else 'cpu')
 
-f = lambda x: 1 / 8 * (np.sin(2 * (x + 0.1)) + 4)
+f = lambda x: 1 / 8 * (np.sin(2 * (x + 0.1)))
 dx = np.arange(0.5, 4.5, 0.001)
 dx_test = np.arange(0.5, 4.5, 0.05)
 dy = f(dx)
@@ -78,7 +78,7 @@ def concrete_dropout():
         dataset_size=x_train.shape[0],
         sample_count=30,
         lr=0.001,
-        max_epochs=1000,
+        max_epochs=3000,
         batch_size=1024,
         optimizer=torch.optim.Adam,
         criterion=CRPSLoss,

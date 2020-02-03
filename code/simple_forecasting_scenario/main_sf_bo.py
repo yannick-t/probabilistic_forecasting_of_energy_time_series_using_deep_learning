@@ -1,8 +1,6 @@
 import torch
-from sklearn.model_selection import train_test_split
 from skopt.space import Real, Integer
 from skorch.callbacks import EarlyStopping
-from skorch.dataset import CVSplit
 
 from models.concrete_dropout import ConcreteDropoutNN
 from models.functional_np import RegressionFNP
@@ -11,8 +9,7 @@ from models.simple_nn import SimpleNN
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
-from util.data.data_src_tools import load_opsd_de_load_daily
-from util.data.data_tools import convert_data_overlap
+from util.data.data_src_tools import load_opsd_de_load_daily, prepare_opsd_daily
 from hyperparameter_opt.bayesian_optimization import bayesian_optimization, mse_scorer, crps_scorer
 
 use_cuda = True
@@ -23,14 +20,7 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 num_prev_val = 7
 num_pred_val = 1
 
-dataset = load_opsd_de_load_daily()
-dataset_normalized = (dataset - dataset.min()) / (dataset.max() - dataset.min())
-x_full, y_full = convert_data_overlap(dataset_normalized, num_prev_val, num_y=num_pred_val, y_as_nx1=True)
-dataset_train, dataset_test = train_test_split(dataset_normalized, test_size=0.1, shuffle=False)
-
-# predict next value by last num_prev_val values
-x_train, y_train = convert_data_overlap(dataset_train, num_prev_val, num_y=num_pred_val, y_as_nx1=True)
-x_test, y_test = convert_data_overlap(dataset_test, num_prev_val, num_y=num_pred_val, y_as_nx1=True)
+x_full, y_full, x_train, y_train, x_test, y_test, scaler = prepare_opsd_daily(num_prev_val, num_pred_val)
 
 
 # benchmark using opsd data to make a simple forecast using different methods
@@ -61,10 +51,12 @@ def fnp_bo():
         'module__dim_z': Integer(8, 128),
         'module__fb_z': Real(0, 4.0),
         'reference_set_size_ratio': Real(0.01, 0.4),
-        'module__hidden_size_0': Integer(64, 256),
-        'module__hidden_size_1': Integer(64, 512),
-        'module__hidden_size_2': Integer(12, 256),
-        'module__hidden_size_3': Integer(1, 256),
+        'module__hidden_size_enc_0': Integer(64, 256),
+        'module__hidden_size_enc_1': Integer(64, 512),
+        'module__hidden_size_enc_2': Integer(1, 256),
+        'module__hidden_size_dec_0': Integer(16, 256),
+        'module__hidden_size_dec_1': Integer(16, 512),
+        'module__hidden_size_dec_2': Integer(1, 256),
     }
 
     bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=512, cv=cv)

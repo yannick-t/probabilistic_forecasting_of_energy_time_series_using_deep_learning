@@ -28,7 +28,6 @@ def load_opsd_de_load_daily():
 def prepare_opsd_daily(num_prev_val, num_pred_val):
     dataset = load_opsd_de_load_daily()
     scaler = StandardScaler()
-    # scaler = MinMaxScaler()
     dataset['DE_load_actual_entsoe_power_statistics'] = \
         scaler.fit_transform(np.array(dataset['DE_load_actual_entsoe_power_statistics']).reshape(-1, 1)).squeeze()
 

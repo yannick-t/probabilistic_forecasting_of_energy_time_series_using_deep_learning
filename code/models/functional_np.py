@@ -31,11 +31,11 @@ import math
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from models.base_nn import BaseNN
+from models.base_nn import BaseNN, hidden_size_extract
 from models.fnp_utils import Normal, float_tensor, logitexp, sample_DAG, sample_bipartite, Flatten, one_hot
 
 
-class RegressionFNP(BaseNN):
+class RegressionFNP(nn.Module):
     """
     Functional Neural Process for regression
     """
@@ -51,13 +51,15 @@ class RegressionFNP(BaseNN):
         :param dim_z: Dimensionality of the  latents that summarize the parents
         :param fb_z: How many free bits do we allow for the latent variable z
         '''
-        super(RegressionFNP, self).__init__(**kwargs)
+        super(RegressionFNP, self).__init__()
+
+        # dynamic hidden units for encoder and decoder
+        self.hidden_size_enc = hidden_size_extract(kwargs, 'hidden_size_enc')
+        self.hidden_size_dec = hidden_size_extract(kwargs, 'hidden_size_dec')
 
         self.num_M = num_M
         self.dim_x = dim_x
         self.dim_y = dim_y
-        self.dim_h = self.hidden_size[-1]
-        n_layers = len(self.hidden_size)
         self.dim_u = int(dim_u) # workaround for skopt
         self.dim_z = int(dim_z) # workaround for skopt
         self.use_plus = use_plus
@@ -73,20 +75,28 @@ class RegressionFNP(BaseNN):
         self.pairwise_g = lambda x: logitexp(-.5 * torch.sum(torch.pow(x[:, self.dim_u:] - x[:, 0:self.dim_u], 2), 1,
                                                              keepdim=True) / self.pairwise_g_logscale.exp()).view(x.size(0), 1)
         # transformation of the input
-        init = [nn.Linear(dim_x, self.hidden_size[0]), nn.ReLU()]
-        for i in range(n_layers - 1):
-            init += [nn.Linear(self.hidden_size[i], self.hidden_size[i + 1]), nn.ReLU()]
+        # initialize output (encoder) hidden layers
+        init = [nn.Linear(dim_x, self.hidden_size_enc[0]), nn.ReLU()]
+        for i in range(len(self.hidden_size_enc) - 1):
+            init += [nn.Linear(self.hidden_size_enc[i], self.hidden_size_enc[i + 1]), nn.ReLU()]
         self.cond_trans = nn.Sequential(*init)
         # p(u|x)
-        self.p_u = nn.Linear(self.dim_h, 2 * self.dim_u)
+        self.p_u = nn.Linear(self.hidden_size_enc[-1], 2 * self.dim_u)
         # q(z|x)
-        self.q_z = nn.Linear(self.dim_h, 2 * self.dim_z)
+        self.q_z = nn.Linear(self.hidden_size_enc[-1], 2 * self.dim_z)
         # for p(z|A, XR, yR)
         self.trans_cond_y = nn.Linear(self.dim_y, 2 * self.dim_z)
 
         # p(y|z) or p(y|z, u)
-        self.output = nn.Sequential(nn.Linear(self.dim_z if not self.use_plus else self.dim_z + self.dim_u, self.dim_h),
-                                    nn.ReLU(), nn.Linear(self.dim_h, 2 * dim_y))
+        # initialize output (decoder) hidden layers
+        dec_h_list = []
+        for i in range(len(self.hidden_size_dec) - 1):
+            dec_h_list += [nn.Linear(self.hidden_size_dec[i], self.hidden_size_dec[i + 1]), nn.ReLU()]
+        dec_h = nn.Sequential(
+            *dec_h_list
+        )
+        self.output = nn.Sequential(nn.Linear(self.dim_z if not self.use_plus else self.dim_z + self.dim_u, self.hidden_size_dec[0]), nn.ReLU(),
+                                    dec_h, nn.Linear(self.hidden_size_dec[-1], 2 * dim_y))
 
     def forward(self, XR, yR, XM, yM, kl_anneal=1.):
         X_all = torch.cat([XR, XM], dim=0)

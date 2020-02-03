@@ -7,14 +7,19 @@ class BaseNN(nn.Module):
     def __init__(self, **kwargs):
         super(BaseNN, self).__init__()
 
-        if 'hidden_size' not in kwargs:
-            hidden_size = []
-            for i in range(0, 6):
-                key = 'hidden_size_%d' % i
-                if key in kwargs and kwargs[key] != 0:
-                    hidden_size.append(kwargs[key])
-        else:
-            hidden_size = kwargs['hidden_size']
+        hidden_size = hidden_size_extract(kwargs, 'hidden_size')
 
         self.hidden_size = hidden_size
 
+
+def hidden_size_extract(kwargs, name):
+    if name not in kwargs:
+        hidden_size = []
+        for i in range(0, 6):
+            key = name + '_%d' % i
+            if key in kwargs and kwargs[key] != 0:
+                hidden_size.append(kwargs[key])
+    else:
+        hidden_size = kwargs[name]
+
+    return hidden_size

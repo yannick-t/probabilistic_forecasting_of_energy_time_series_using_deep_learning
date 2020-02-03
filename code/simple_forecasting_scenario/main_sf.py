@@ -31,7 +31,7 @@ model_prefix = 'simple_forecasting_'
 def main():
     x_full, y_full, x_train, y_train, x_test, y_test, scaler = prepare_opsd_daily(num_prev_val, num_pred_val)
     model = concrete_init(x_train, y_train)
-    load_train(model, x_train, y_train, 'concrete', load_saved=True)
+    load_train(model, x_train, y_train, 'concrete', load_saved=False)
 
     pred_y = model.predict(x_test)
     pred_y_full = model.predict(x_full)
