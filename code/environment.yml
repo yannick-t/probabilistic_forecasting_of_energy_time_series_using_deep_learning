@@ -18,4 +18,5 @@ dependencies:
   - pip:
     - gpytorch==1.0.1
     - workalendar==8.0.2
+    - torchbnn==0.9
 

@@ -10,9 +10,11 @@ from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
 from models.simple_nn import SimpleNN
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
+from models.skorch_wrappers.bnn_skorch import BNNSkorch
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
+from models.torch_bnn import TorchBNN
 from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 
@@ -42,9 +44,34 @@ x_test = np.expand_dims(dx_test, 1)
 # some code to test the combined uncertainty estimates of the models
 # on a toy problem and visualizing results
 def main():
-    deep_ensemble()
+    bayesian_nn()
 
 
+def bayesian_nn():
+    bnn = BNNSkorch(module=TorchBNN,
+                    module__input_size=x_train.shape[-1],
+                    module__output_size=y_train.shape[-1] * 2,
+                    module__hidden_size=[16],
+                    module__prior_mu=0,
+                    module__prior_sigma=0.4,
+                    sample_count=30,
+                    lr=0.001,
+                    max_epochs=10000,
+                    train_split=None,
+                    batch_size=1024,
+                    optimizer=torch.optim.Adam,
+                    criterion=HeteroscedasticLoss,
+                    device=device)
+
+    bnn.fit(x_train, y_train)
+
+    pred = bnn.predict(x_test)
+    pred_mean = pred[..., 0]
+    pred_var = pred[..., 1]
+    pred_epis_std = pred[..., 2]
+    pred_aleo_std = pred[..., 3]
+
+    plot_all(pred_mean, pred_var, pred_epis_std, pred_aleo_std)
 
 
 def simple_nn():
