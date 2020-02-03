@@ -24,9 +24,6 @@ class HeteroscedasticLoss(nn.Module):
 
         # bayesian nll
         dist = Normal(mean, std)
-        loss = (-dist.log_prob(target)).mean()
-
-        if (loss > 1000).any():
-            print(loss)
+        loss = (-dist.log_prob(target)).mean(0)
 
         return loss

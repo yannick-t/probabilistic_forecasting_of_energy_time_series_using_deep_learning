@@ -132,4 +132,5 @@ def plot_test_data(pred_mean, pred_var, y_true, ax):
                             alpha=0.1, color='orange')
 
 
-main()
+if __name__ == '__main__':
+    main()

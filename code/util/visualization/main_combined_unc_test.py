@@ -4,8 +4,12 @@ import matplotlib.pyplot as plt
 from numpy.distutils.command.config_compiler import config_cc
 
 from models.concrete_dropout import ConcreteDropoutNN
+from models.deep_ensemble_single import DeepEnsembleSingle
+from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
+from models.simple_nn import SimpleNN
+from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
@@ -17,7 +21,7 @@ use_cuda = use_cuda & torch.cuda.is_available()
 
 device = torch.device('cuda' if use_cuda else 'cpu')
 
-f = lambda x: 1 / 8 * (np.sin(2 * (x + 0.1)))
+f = lambda x: 1 / 8 * (np.sin(2 * (x + 0.1)) + 4)
 dx = np.arange(0.5, 4.5, 0.001)
 dx_test = np.arange(0.5, 4.5, 0.05)
 dy = f(dx)
@@ -25,7 +29,7 @@ dy = f(dx)
 obs_aleo_x = np.arange(0.6, 2.5, 0.1)
 
 aleo_het_stds_f = lambda x: 1 / 30 * (np.sin(1.5 * x) + 1.2)
-obs_aleo_het_y = np.random.normal(f(obs_aleo_x), aleo_het_stds_f(obs_aleo_x), [30, obs_aleo_x.size]).transpose()
+obs_aleo_het_y = np.random.normal(f(obs_aleo_x), aleo_het_stds_f(obs_aleo_x), [40, obs_aleo_x.size]).transpose()
 aleo_het_stds = aleo_het_stds_f(dx)
 
 # train model on observation
@@ -38,7 +42,58 @@ x_test = np.expand_dims(dx_test, 1)
 # some code to test the combined uncertainty estimates of the models
 # on a toy problem and visualizing results
 def main():
-    concrete_dropout()
+    deep_ensemble()
+
+
+
+
+def simple_nn():
+    nn = BaseNNSkorch(
+        module=DeepEnsembleSingle,
+        module__input_size=x_train.shape[-1],
+        module__output_size=y_train.shape[-1] * 2,
+        module__hidden_size=[128],
+        lr=0.001,
+        max_epochs=200,
+        batch_size=1024,
+        optimizer=torch.optim.Adam,
+        criterion=HeteroscedasticLoss,
+        device=device,
+        train_split=None,
+        verbose=1
+    )
+
+    nn.fit(x_train, y_train)
+
+    pred = nn.predict(x_test)
+    pred_mean = pred[..., 0]
+    pred_std = torch.sigmoid(torch.as_tensor(pred[..., 1])).cpu().numpy()
+
+    plot_single(pred_mean, pred_std)
+
+
+def deep_ensemble():
+    deep_ens = DeepEnsemble(
+        input_size=x_train.shape[-1],
+        output_size=y_train.shape[-1] * 2,
+        hidden_size=[32],
+        lr=0.001,
+        max_epochs=1000,
+        batch_size=1024,
+        optimizer=torch.optim.Adam,
+        criterion=HeteroscedasticLoss,
+        device=device
+    )
+
+    deep_ens.fit(x_train, y_train)
+
+    pred = deep_ens.predict(x_test)
+    pred_mean = pred[..., 0]
+    pred_var = pred[..., 1]
+    pred_epis_std = pred[..., 2]
+    pred_aleo_std = pred[..., 3]
+
+    plot_all(pred_mean, pred_var, pred_epis_std, pred_aleo_std)
 
 
 def functional_np():
@@ -81,7 +136,7 @@ def concrete_dropout():
         max_epochs=3000,
         batch_size=1024,
         optimizer=torch.optim.Adam,
-        criterion=CRPSLoss,
+        criterion=HeteroscedasticLoss,
         device=device,
         verbose=1
     )
@@ -133,6 +188,12 @@ def plot_all(pred_mean, pred_var, pred_epis_std, pred_aleo_std):
     plt.show()
 
 
+def plot_single(pred_mean, pred_std):
+    ax = plt.subplot(1, 1, 1)
+    plot(obs_aleo_x, obs_aleo_het_y, dx_test, pred_mean, pred_std, dx, dy, ax)
+    plt.show()
+
+
 def plot(obs_x, obs_y, pred_x, pred_means, pred_stds, dx, dy, ax):
     pred_means = pred_means.squeeze()
     pred_stds = pred_stds.squeeze()
@@ -160,4 +221,5 @@ def plot(obs_x, obs_y, pred_x, pred_means, pred_stds, dx, dy, ax):
                         alpha=0.2, color='orange')
 
 
-main()
+if __name__ == '__main__':
+    main()

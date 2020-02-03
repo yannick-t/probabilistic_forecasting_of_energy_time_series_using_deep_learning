@@ -17,15 +17,13 @@ class SimpleNN(BaseNN):
             nn.init.xavier_uniform_(fc.weight)
         nn.init.xavier_uniform_(self.fc2.weight)
 
-    def forward(self, x, dropout_rate=0):
+    def forward(self, x):
         out = self.fc1(x)
-        out = torch.sigmoid(out)
+        out = torch.relu(out)
 
         for fc in self.fcs:
             out = fc(out)
-            out = torch.sigmoid(out)
-
-        out = torch.dropout(out, dropout_rate, True)
+            out = torch.relu(out)
 
         out = self.fc2(out)
         return out

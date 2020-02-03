@@ -1,6 +1,9 @@
 from skorch import NeuralNet
 import torch
 
+# base skorch wrapper to automatically set default tensor type / device
+# for prallel processing, because the defaults need to be set on each process
+
 
 class BaseNNSkorch(NeuralNet):
     def __init__(self, *args, **kwargs):
@@ -31,3 +34,7 @@ class BaseNNSkorch(NeuralNet):
             kwargs['batch_size'] = int(kwargs['batch_size'])
 
         return iterator(dataset, **kwargs)
+
+    def fit(self, X, y=None, **fit_params):
+        torch.set_default_tensor_type('torch.' + ('cuda.' if self.device == 'cuda' else '') + 'DoubleTensor')
+        super(BaseNNSkorch, self).fit(X, y, **fit_params)
