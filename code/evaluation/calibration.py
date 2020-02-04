@@ -43,7 +43,12 @@ def probabilistic_calibration(pred_y_mean, pred_y_var, y_true, ax):
 
     pt = pt.squeeze().numpy()
 
-    ax.hist(pt, n_bins, color='lightblue', density=True, weights=np.zeros_like(pt) + 1. / pt.size)
+    ax.hist(pt, n_bins, color='lightblue', density=True, weights=np.zeros_like(pt) + 1. / pt.size, rwidth=0.9)
+
+    # 1 line
+    px = np.arange(0, 1, 0.01)
+    ax.plot(px, np.repeat(1, px.shape), color='lightgray', linestyle="--", alpha=0.75)
+
     ax.margins(0, 0.06)
 
 
@@ -89,6 +94,8 @@ def marginal_calibration(pred_y_mean, pred_y_var, y_true, ax):
     dif = pcdf - ecdf
 
     ax.plot(plt_x, dif, color='lightblue')
+
+    ax.plot(plt_x, np.repeat(0, plt_x.shape), color='lightgray', linestyle="--", alpha=0.75)
 
 
 def pit_sanity_check():

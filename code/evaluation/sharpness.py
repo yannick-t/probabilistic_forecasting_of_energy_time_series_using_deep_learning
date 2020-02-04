@@ -8,6 +8,7 @@ def sharpness_plot_multiple(names, pred_y_var):
     ax.set_ylabel('Width')
 
     sharpness_plot_(pred_y_var, ax, names)
+    plt.subplots_adjust(left=0.1)
 
     plt.show()
 
@@ -25,16 +26,15 @@ def sharpness_plot_histogram(pred_y_var, ax):
 
 def sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
     n_bins = 25
-    ax.hist(np.sqrt(pred_test_var), n_bins, histtype='stepfilled', color='lightblue',
-            density=True, weights=np.zeros_like(pred_test_var) + 1. / pred_test_var.size)
-    ax.hist(np.sqrt(pred_ood_var), n_bins, histtype='step', color='orange',
-            density=True, weights=np.zeros_like(pred_ood_var) + 1. / pred_ood_var.size)
+    ax.hist(np.sqrt(pred_test_var), n_bins, histtype='stepfilled', color='lightblue')
+    ax.hist(np.sqrt(pred_ood_var), n_bins, histtype='step', color='orange')
+    ax.set_yticklabels([])
     ax.margins(0, 0.06)
 
 
 def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars):
     count = len(names)
-    fig, axes = plt.subplots(1, count, sharey='row')
+    fig, axes = plt.subplots(1, count, sharey='row', sharex='row')
 
     for counter, (name, p_test_var, p_ood_var) in enumerate(zip(names, pred_test_vars, pred_ood_vars)):
         ax = axes[counter]
