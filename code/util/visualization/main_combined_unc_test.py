@@ -30,7 +30,7 @@ dy = f(dx)
 
 obs_aleo_x = np.arange(0.6, 2.5, 0.1)
 
-aleo_het_stds_f = lambda x: 1 / 30 * (np.sin(1.5 * x) + 1.2)
+aleo_het_stds_f = lambda x: 1 * (np.sin(1.5 * x) + 1.2)
 obs_aleo_het_y = np.random.normal(f(obs_aleo_x), aleo_het_stds_f(obs_aleo_x), [40, obs_aleo_x.size]).transpose()
 aleo_het_stds = aleo_het_stds_f(dx)
 
@@ -44,7 +44,7 @@ x_test = np.expand_dims(dx_test, 1)
 # some code to test the combined uncertainty estimates of the models
 # on a toy problem and visualizing results
 def main():
-    bayesian_nn()
+    deep_gp()
 
 
 def bayesian_nn():
@@ -181,11 +181,13 @@ def concrete_dropout():
 def deep_gp():
     dgp = DeepGPSkorch(module=DeepGaussianProcess,
                        module__input_size=x_train.shape[-1],
-                       module__hidden_size=[2],
+                       module__hidden_size=[1],
                        module__output_size=y_train.shape[-1] * 2,
                        module__num_inducing=128,
                        lr=0.01,
-                       max_epochs=400,
+                       max_epochs=1000,
+                       batch_size=256,
+                       train_split=None,
                        optimizer=torch.optim.Adam,
                        num_data=x_train.shape[0],
                        device=device)

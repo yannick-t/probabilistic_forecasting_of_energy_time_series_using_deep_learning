@@ -17,7 +17,7 @@ from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 
 class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
     def __init__(self, input_size, output_size, optimizer, criterion, device='cpu',
-                 batch_size=128, max_epochs=100, lr=0.001, num_ensembles=5, **kwargs):
+                 batch_size=128, max_epochs=100, lr=0.001, ensemble_size=5, **kwargs):
         self.input_size = input_size
         self.output_size = output_size
         self.optimizer = optimizer
@@ -26,11 +26,15 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
         self.batch_size = batch_size
         self.max_epochs = max_epochs
         self.lr = lr
-        self.num_ensembles = num_ensembles
+        self.ensemble_size = ensemble_size
         self.hidden_size = hidden_size_extract(kwargs, 'hidden_size')
 
         self.models = []
         self.init_ensemble()
+
+    def initialize(self):
+        for model in self.models:
+            model.initialize()
 
     def set_params(self, **params):
         super(DeepEnsemble, self).set_params(**params)
@@ -39,7 +43,7 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
 
     def init_ensemble(self):
         self.models = []
-        for _ in range(self.num_ensembles):
+        for _ in range(self.ensemble_size):
             model = BaseNNSkorch(DeepEnsembleSingle, module__input_size=self.input_size, module__output_size=self.output_size,
                                  module__hidden_size=self.hidden_size,
                                  optimizer=self.optimizer, criterion=self.criterion, device=self.device, batch_size=self.batch_size,
@@ -51,7 +55,7 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
     def fit(self, X, y):
         # fit each with shuffled copies of the training data separately
         # according to original paper
-        pool = Pool(self.num_ensembles)
+        pool = Pool(self.ensemble_size)
         args = [(model, X, y) for model in self.models]
         self.models = pool.starmap(self.fit_single, args)
 
@@ -76,9 +80,17 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
         # predict with each model
         output_size = self.output_size
         assert output_size % 2 == 0
-        preds = torch.zeros((X.shape[0], self.num_ensembles, output_size))
+        preds = torch.zeros((X.shape[0], self.ensemble_size, output_size))
 
         for j, model in enumerate(self.models):
             preds[:, j] = torch.as_tensor(model.predict(X), device=self.device)
 
         return combine_uncertainties(preds, output_size)
+
+    def save_params(self, file):
+        for i, model in enumerate(self.models):
+            model.save_params(file + '_%d' % i)
+
+    def load_params(self, file):
+        for i, model in enumerate(self.models):
+            model.load_params(file + '_%d' % i)

@@ -1,0 +1,49 @@
+#### figure
+figure.subplot.wspace  : 0.1
+figure.subplot.left    : 0.05  ## the left side of the subplots of the figure
+figure.subplot.right   : 0.95    ## the right side of the subplots of the figure
+#figure.subplot.bottom  : 0.11   ## the bottom of the subplots of the figure
+#figure.subplot.top     : 0.88   ## the top of the subplots of the figure
+
+#### axes
+axes.facecolor       : ffffff
+axes.edgecolor       : b0b0b0
+axes.linewidth       : 0.4
+axes.grid            : True
+axes.titlesize       : large
+axes.labelsize       : medium
+axes.labelcolor      : 555555
+axes.axisbelow       : True
+# axes.prop_cycle    : cycler('color', ['348ABD', '7A68A6', 'A60628', '467821', 'CF4457', '188487', 'E24A33'])
+axes.spines.left   : True   ## display axis spines
+axes.spines.bottom : True
+axes.spines.top    : False
+axes.spines.right  : False
+
+#### grid
+grid.color           : b0b0b0
+grid.linestyle       : :
+grid.linewidth       : 0.85
+grid.alpha           : 0.5
+
+#### legend
+legend.fontsize      : medium
+legend.fancybox      : False
+legend.frameon       : False
+
+#### ticks
+xtick.major.size     : 0
+xtick.minor.size     : 0
+xtick.major.pad      : 6
+xtick.minor.pad      : 6
+xtick.color          : 555555
+xtick.labelsize      : small
+xtick.direction      : in
+
+ytick.major.size     : 0
+ytick.minor.size     : 0
+ytick.major.pad      : 6
+ytick.minor.pad      : 6
+ytick.color          : 555555
+ytick.labelsize      : small
+ytick.direction      : in

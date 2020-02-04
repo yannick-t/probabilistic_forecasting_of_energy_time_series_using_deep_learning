@@ -3,8 +3,6 @@ import torch
 from torch.distributions import Normal
 import numpy as np
 
-from util.visualization.plotting import default_fig_style, default_plt_style
-
 
 def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     count = len(pred_y_mean)
@@ -12,10 +10,9 @@ def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
         ax = axes[counter]
         ax.set_title(name)
-        default_fig_style(ax)
         probabilistic_calibration(pmean, pvar, y_true, ax)
     fig.text(0.04, 0.5, 'Relative Frequency', va='center', rotation='vertical')
-    plt.tight_layout()
+    plt.subplots_adjust(left=0.1)
     plt.show()
 
 
@@ -25,11 +22,10 @@ def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
         ax = axes[counter]
         ax.set_title(name)
-        default_fig_style(ax)
 
         marginal_calibration(pmean, pvar, y_true, ax)
-    # fig.text(0.04, 0.5, 'Relative Frequency', va='center', rotation='vertical')
-    plt.tight_layout()
+    fig.text(0.04, 0.5, 'Diff. emp. CDF avg. Pred. CDF', va='center', rotation='vertical')
+    plt.subplots_adjust(left=0.1)
     plt.show()
 
 
@@ -65,8 +61,6 @@ def interval_coverage(pred_y_mean, pred_y_var, y_true, interval):
 
 
 def marginal_calibration(pred_y_mean, pred_y_var, y_true, ax):
-    default_plt_style(plt)
-
     mean = torch.Tensor(pred_y_mean).cpu().squeeze()
     var = torch.Tensor(pred_y_var).cpu().squeeze()
     y = torch.Tensor(y_true).cpu().squeeze()
@@ -82,6 +76,10 @@ def marginal_calibration(pred_y_mean, pred_y_var, y_true, ax):
 
     min_x = y.min()
     max_x = y.max()
+    eps = np.abs(max_x - min_x) * 0.05
+    min_x = min_x - eps
+    max_x = max_x + eps
+
     step = (max_x - min_x) / 1000
     plt_x = torch.arange(min_x, max_x, step)
 

@@ -4,10 +4,11 @@ import numpy as np
 import torch
 from skorch.utils import to_numpy, to_tensor
 
+from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from training.loss.deepgp_heteroscedastic_loss import DeepGPHeteroscedasticLoss
 
 
-class DeepGPSkorch(NeuralNet):
+class DeepGPSkorch(BaseNNSkorch):
     def __init__(self, num_data, *args, **kwargs):
         self.num_data = num_data
         kwargs['criterion'] = None
@@ -40,7 +41,7 @@ class DeepGPSkorch(NeuralNet):
 
     def get_loss(self, y_pred, y_true, X=None, training=False):
         y_true = to_tensor(y_true, device=self.device)
-        return -self.criterion_(y_pred, y_true.squeeze())
+        return -self.criterion_(y_pred, y_true)
 
     def predict(self, X):
         self.module_.eval()

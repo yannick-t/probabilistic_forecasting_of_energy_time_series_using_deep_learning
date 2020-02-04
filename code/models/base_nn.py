@@ -20,6 +20,6 @@ def hidden_size_extract(kwargs, name):
             if key in kwargs and kwargs[key] != 0:
                 hidden_size.append(kwargs[key])
     else:
-        hidden_size = kwargs[name]
+        hidden_size = kwargs[name].copy()
 
     return hidden_size

@@ -20,7 +20,7 @@ def process_opsd_de_load():
 
 
 def load_opsd_de_load_daily():
-    dataset = pandas.read_csv('../DE_load_actual_entsoe_power_statistics_daily_avg.csv', header=0,
+    dataset = pandas.read_csv('../../DE_load_actual_entsoe_power_statistics_daily_avg.csv', header=0,
                               infer_datetime_format=True, parse_dates=[0], index_col=[0])
     return dataset
 

@@ -1,5 +1,4 @@
 from matplotlib import pyplot as plt
-from util.visualization.plotting import default_plt_style, default_fig_style
 from scipy.special import erfinv
 import numpy as np
 
@@ -7,8 +6,6 @@ import numpy as np
 def sharpness_plot_multiple(names, pred_y_var):
     ax = plt.subplot(1, 1, 1)
     ax.set_ylabel('Width')
-
-    default_fig_style(ax)
 
     sharpness_plot_(pred_y_var, ax, names)
 
@@ -19,13 +16,43 @@ def sharpness_plot(pred_y_var, ax, scaler=None):
     sharpness_plot_([pred_y_var], ax, scaler=scaler)
 
 
+def sharpness_plot_histogram(pred_y_var, ax):
+    n_bins = 60
+    ax.hist(pred_y_var, n_bins, histtype='step', color='lightblue',
+            density=True, weights=np.zeros_like(pred_y_var) + 1. / pred_y_var.size)
+    ax.margins(0, 0.06)
+
+
+def sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
+    n_bins = 25
+    ax.hist(np.sqrt(pred_test_var), n_bins, histtype='stepfilled', color='lightblue',
+            density=True, weights=np.zeros_like(pred_test_var) + 1. / pred_test_var.size)
+    ax.hist(np.sqrt(pred_ood_var), n_bins, histtype='step', color='orange',
+            density=True, weights=np.zeros_like(pred_ood_var) + 1. / pred_ood_var.size)
+    ax.margins(0, 0.06)
+
+
+def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars):
+    count = len(names)
+    fig, axes = plt.subplots(1, count, sharey='row')
+
+    for counter, (name, p_test_var, p_ood_var) in enumerate(zip(names, pred_test_vars, pred_ood_vars)):
+        ax = axes[counter]
+        ax.set_title(name)
+
+        sharpness_plot_histogram_joint(p_test_var, p_ood_var, ax)
+
+    plt.show()
+
+
 def sharpness_plot_(pred_y_var, ax, names=None, scaler=None):
     q_5 = np.sqrt(2) * erfinv(0.5)
     q_9 = np.sqrt(2) * erfinv(0.9)
 
     pred_y_var = np.array(pred_y_var)
 
-    quantiles = np.empty([pred_y_var.shape[0] * 2, 5])
+    widths_5_list = np.empty([pred_y_var.shape[0], pred_y_var.shape[1]])
+    widths_9_list = np.empty([pred_y_var.shape[0], pred_y_var.shape[1]])
 
     for counter, pred_var in enumerate(pred_y_var):
 
@@ -34,22 +61,18 @@ def sharpness_plot_(pred_y_var, ax, names=None, scaler=None):
         widths_5 = q_5 * pred_std
         widths_9 = q_9 * pred_std
 
-        # display 5, 25, 50, 75, 95 percentile / quantile to assess sharpness in a heteroscedastic scenario (like in
-        # "Gneiting, T., Balabdaoui, F., & Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness.
-        # Journal of the Royal Statistical Society: Series B (Statistical Methodology), 69(2), 243-268.")
-        quantiles_5 = np.quantile(widths_5, [0.05, 0.25, 0.5, 0.75, 0.95], axis=-2)
-        quantiles_9 = np.quantile(widths_9, [0.05, 0.25, 0.5, 0.75, 0.95], axis=-2)
+        widths_5_list[counter] = widths_5.squeeze()
+        widths_9_list[counter] = widths_9.squeeze()
 
-        if scaler is not None:
-            quantiles_5 = scaler.inverse_transform(quantiles_5)
-            quantiles_9 = scaler.inverse_transform(quantiles_9)
+    widths = np.concatenate([widths_5_list, widths_9_list])
 
-        quantiles[(counter * 2)] = quantiles_5.squeeze()
-        quantiles[(counter * 2) + 1] = quantiles_9.squeeze()
-
-    ax.boxplot([q for q in quantiles])
+    # display 5, 25, 50, 75, 95 percentile / quantile as boxplot to assess sharpness in a heteroscedastic scenario
+    # (like in
+    # "Gneiting, T., Balabdaoui, F., & Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness.
+    # Journal of the Royal Statistical Society: Series B (Statistical Methodology), 69(2), 243-268.")
+    ax.boxplot([q for q in widths], showfliers=False, whis=[5, 95])
     if names is not None:
-        ax.set_xticklabels(np.concatenate([[name + ' 50%', name + ' 90%'] for name in names]))
+        ax.set_xticklabels(np.concatenate([[name + ' 50%' for name in names], [name + ' 90%' for name in names]]))
     else:
         ax.set_xticklabels(['50%', '90%'])
 
