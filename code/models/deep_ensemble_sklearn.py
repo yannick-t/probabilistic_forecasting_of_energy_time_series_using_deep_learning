@@ -37,8 +37,9 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
             model.initialize()
 
     def set_params(self, **params):
+        self.hidden_size = hidden_size_extract(params, 'hidden_size',
+                                               delete_from_dict=True)  # for sklearn consistency
         super(DeepEnsemble, self).set_params(**params)
-        self.hidden_size = hidden_size_extract(params, 'hidden_size')
         self.init_ensemble()
 
     def init_ensemble(self):

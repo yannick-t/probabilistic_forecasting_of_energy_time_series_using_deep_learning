@@ -31,11 +31,10 @@ x_full, y_full, x_train, y_train, x_test, y_test, scaler = prepare_opsd_daily(nu
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    fnp_bo()
+    deep_gp_bo()
 
 
 def deep_gp_bo():
-    # TODO: fix
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
         module__input_size=x_train.shape[-1],
@@ -55,32 +54,34 @@ def deep_gp_bo():
              'module__num_inducing': Integer(16, 512),
              }
 
-    bayesian_optimization(dgp, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=512)
+    bayesian_optimization(dgp, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=256,
+                          n_jobs=1)  # workaround for pickling error of gpytorch stuff, can't run prallel
 
 
 def bnn_bo():
-    # TODO: fix
     bnn = BNNSkorch(
         module=TorchBNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
         module__prior_mu=0,
-        module__prior_sigma=0.4,
+        module__prior_sigma=0.1,
         sample_count=30,
         train_split=None,
         max_epochs=5000,
         batch_size=1024,
         optimizer=torch.optim.Adam,
         criterion=HeteroscedasticLoss,
-        device=device)
+        device=device,
+        verbose=0
+    )
 
     space = {'lr': Real(0.001, 0.03, 'log-uniform'),
              'module__hidden_size_0': Integer(16, 256),
-             'module__hidden_size_1': Integer(16, 256),
+             'module__hidden_size_1': Integer(16, 512),
              'module__hidden_size_2': Integer(1, 256),
              'module__hidden_size_3': Integer(1, 256),
              'module__prior_mu': Real(-10, 10),
-             'module__prior_sigma': Real(0.01, 10),
+             'module__prior_sigma': Real(0.001, 0.15),
              # 'module__hidden_size_4': Integer(1, 1024),
              # 'module__hidden_size_5': Integer(1, 1024),
              }
@@ -89,7 +90,6 @@ def bnn_bo():
 
 
 def deep_ens_bo():
-    # TODO: fix
     deep_ens = DeepEnsemble(
         input_size=x_train.shape[-1],
         output_size=y_train.shape[-1] * 2,
@@ -102,19 +102,18 @@ def deep_ens_bo():
     )
 
     space = {'lr': Real(0.01, 0.1, 'log-uniform'),
-             'module__hidden_size_0': Integer(16, 1024),
-             'module__hidden_size_1': Integer(16, 1024),
-             'module__hidden_size_2': Integer(1, 1024),
-             'module__hidden_size_3': Integer(1, 1024),
-             # 'module__hidden_size_4': Integer(1, 1024),
-             # 'module__hidden_size_5': Integer(1, 1024),
+             'hidden_size_0': Integer(16, 1024),
+             'hidden_size_1': Integer(16, 1024),
+             'hidden_size_2': Integer(1, 1024),
+             'hidden_size_3': Integer(1, 1024),
+             # 'hidden_size_4': Integer(1, 1024),
+             # 'hidden_size_5': Integer(1, 1024),
              }
 
     bayesian_optimization(deep_ens, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=512)
 
 
 def fnp_bo():
-    # TODO: fix
     cv = 5
     fnp = RegressionFNPSkorch(
         module=RegressionFNP,
@@ -123,14 +122,13 @@ def fnp_bo():
         train_split=None,
         optimizer=torch.optim.Adam,
         device=device,
-        batch_size=64,
         train_size=int((1 - 1 / cv) * x_train.shape[0]),
         verbose=0
     )
 
     space = {
         'lr': Real(0.001, 0.01, 'log-uniform'),
-        'max_epochs': Integer(40, 150),
+        'max_epochs': Integer(1, 2),
         'batch_size': [32, 64, 128],
         'module__dim_u': Integer(1, 16),
         'module__dim_z': Integer(8, 128),

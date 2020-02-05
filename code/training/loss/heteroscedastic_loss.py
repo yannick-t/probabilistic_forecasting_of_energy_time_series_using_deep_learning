@@ -19,8 +19,9 @@ class HeteroscedasticLoss(nn.Module):
         mean = preds[:, :outut_dim]
         std = preds[:, outut_dim:]
 
-        # use sigmoid to be numerically stable and not depend on activation functions of nn
-        std = torch.sigmoid(std)
+        # use softplus to be numerically stable and not depend on activation functions of nn
+        softplus = torch.nn.Softplus()
+        std = softplus(std)
 
         # bayesian nll
         dist = Normal(mean, std)

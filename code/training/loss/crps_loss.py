@@ -21,8 +21,9 @@ class CRPSLoss(nn.Module):
         mu = preds[:, :outut_dim]
         sigma = preds[:, outut_dim:]
 
-        # use sigmoid to be numerically stable and not depend on activation functions of nn
-        sigma = torch.sigmoid(sigma)
+        # use softplus to be numerically stable and not depend on activation functions of nn
+        softplus = torch.nn.Softplus()
+        sigma = softplus(sigma)
 
         # crps
         # Gneiting, T., Raftery, A. E., Westveld III, A. H., & Goldman, T. (2005).

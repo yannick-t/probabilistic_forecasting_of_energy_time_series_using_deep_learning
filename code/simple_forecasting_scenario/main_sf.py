@@ -1,5 +1,3 @@
-import os
-
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
@@ -11,9 +9,13 @@ from evaluation.sharpness import sharpness_plot_multiple, sharpness_plot, sharpn
     sharpness_plot_histogram_joint, sharpness_plot_histogram_joint_multiple
 from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_ensemble_sklearn import DeepEnsemble
+from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
+from models.skorch_wrappers.bnn_skorch import BNNSkorch
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
+from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
+from models.torch_bnn import TorchBNN
 from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 from util.data.data_src_tools import load_opsd_de_load_daily, prepare_opsd_daily
@@ -41,16 +43,60 @@ def main():
     load_train(concrete, x_train, y_train, 'concrete', load_saved=True)
 
     fnp = fnp_init(x_train, y_train)
-    load_train(fnp, x_train, y_train, 'fnp', load_saved=False)
+    load_train(fnp, x_train, y_train, 'fnp', load_saved=True)
     fnp.choose_r(x_train, y_train)  # set up reference set in case the model was loaded
 
     deep_ens = deep_ensemble_init(x_train, y_train)
     load_train(deep_ens, x_train, y_train, 'deep_ens', load_saved=True)
 
-    pred_means, pred_vars = predict_transform_multiple([concrete, fnp, deep_ens], x_test, scaler)
-    _, pred_ood_vars = predict_transform_multiple([concrete, fnp, deep_ens], x_ood_rand, scaler)
-    #
-    # evaluate_multiple(['Concrete', 'FNP', 'Deep Ens.'], pred_means, pred_vars, y_test_orig, pred_ood_vars)
+    bnn = bnn_init(x_train, y_train)
+    load_train(bnn, x_train, y_train, 'bnn', load_saved=True)
+
+    dgp = deep_gp_init(x_train, y_train)
+    load_train(dgp, x_train, y_train, 'deep_gp', load_saved=False)
+
+    pred_means, pred_vars = predict_transform_multiple([concrete, fnp, deep_ens, bnn], x_test, scaler)
+    _, pred_ood_vars = predict_transform_multiple([concrete, fnp, deep_ens, bnn], x_ood_rand, scaler)
+
+    evaluate_multiple(['Concrete', 'FNP', 'Deep Ens.', 'BNN'], pred_means, pred_vars, y_test_orig, pred_ood_vars)
+
+
+def deep_gp_init(x_train, y_train):
+    dgp = DeepGPSkorch(
+        module=DeepGaussianProcess,
+        module__input_size=x_train.shape[-1],
+        module__hidden_size=[4],
+        module__output_size=y_train.shape[-1] * 2,
+        module__num_inducing=128,
+        lr=0.01,
+        max_epochs=100,
+        batch_size=256,
+        train_split=None,
+        optimizer=torch.optim.Adam,
+        num_data=x_train.shape[0],
+        device=device)
+
+    return dgp
+
+
+def bnn_init(x_train, y_train):
+    bnn = BNNSkorch(
+        module=TorchBNN,
+        module__input_size=x_train.shape[-1],
+        module__output_size=y_train.shape[-1] * 2,
+        module__hidden_size=[32, 48, 7],
+        module__prior_mu=0,
+        module__prior_sigma=0.1,
+        sample_count=30,
+        lr=0.001,
+        max_epochs=10000,
+        train_split=None,
+        batch_size=1024,
+        optimizer=torch.optim.Adam,
+        criterion=HeteroscedasticLoss,
+        device=device)
+
+    return bnn
 
 
 def fnp_init(x_train, y_train):
@@ -103,10 +149,10 @@ def concrete_init(x_train, y_train):
         sample_count=30,
         lr=0.001,
         train_split=None,
-        max_epochs=1024,
+        max_epochs=100,
         batch_size=1024,
         optimizer=torch.optim.Adam,
-        criterion=CRPSLoss,
+        criterion=HeteroscedasticLoss,
         device=device,
         verbose=1)
 

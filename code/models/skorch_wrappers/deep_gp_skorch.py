@@ -52,7 +52,8 @@ class DeepGPSkorch(BaseNNSkorch):
 
         mean = predictive_means.mean(0)[..., :outut_dim]
         epistemic_var = predictive_variances.mean(0)[..., :outut_dim]
-        aleotoric_var = torch.sigmoid(predictive_means.mean(0)[..., outut_dim:])**2
+        softplus = torch.nn.Softplus()
+        aleotoric_var = softplus(predictive_means.mean(0)[..., outut_dim:])**2
         var = epistemic_var + aleotoric_var
 
         return np.stack(

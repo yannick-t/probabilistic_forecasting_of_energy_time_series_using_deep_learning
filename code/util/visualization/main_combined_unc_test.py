@@ -53,7 +53,7 @@ def bayesian_nn():
                     module__output_size=y_train.shape[-1] * 2,
                     module__hidden_size=[16],
                     module__prior_mu=0,
-                    module__prior_sigma=0.4,
+                    module__prior_sigma=0.1,
                     sample_count=30,
                     lr=0.001,
                     max_epochs=10000,
@@ -94,7 +94,8 @@ def simple_nn():
 
     pred = nn.predict(x_test)
     pred_mean = pred[..., 0]
-    pred_std = torch.sigmoid(torch.as_tensor(pred[..., 1])).cpu().numpy()
+    softplus = torch.nn.Softplus()
+    pred_std = softplus(torch.as_tensor(pred[..., 1])).cpu().numpy()
 
     plot_single(pred_mean, pred_std)
 

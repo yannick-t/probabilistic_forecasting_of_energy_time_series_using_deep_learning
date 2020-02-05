@@ -35,8 +35,9 @@ def combine_uncertainties(preds, output_size):
     outut_dim = int(output_size / 2)
     mean = preds[..., :outut_dim].mean(dim=1)
 
-    # use sigmoid to be numerically stable and not depend on activation functions of nn
-    aleo_sampled = torch.sigmoid(preds[..., outut_dim:])
+    # use softplus to be numerically stable and not depend on activation functions of nn
+    softplus = torch.nn.Softplus()
+    aleo_sampled = softplus(preds[..., outut_dim:])
 
     # combined approx variance from paper
     # Kendall, A., & Gal, Y. (2017).

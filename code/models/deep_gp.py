@@ -39,6 +39,8 @@ from models.base_nn import hidden_size_extract
 
 class DeepGPHiddenLayer(DeepGPLayer):
     def __init__(self, input_dims, output_dims, num_inducing=128, mean_type='constant'):
+        num_inducing = int(num_inducing)  # skopt workaround
+
         if output_dims is None:
             inducing_points = torch.randn(num_inducing, input_dims)
             batch_shape = torch.Size([])
@@ -99,7 +101,7 @@ class DeepGPHiddenLayer(DeepGPLayer):
 class DeepGaussianProcess(DeepGP):
     def __init__(self, input_size, output_size, num_inducing=128, **kwargs):
         # pass hidden layer sizes as separate arguments as well as array
-        hidden_size = hidden_size_extract(kwargs)
+        hidden_size = hidden_size_extract(kwargs, 'hidden_size')
 
         self.hidden_size = hidden_size
         self.hidden_size.append(output_size)
