@@ -34,6 +34,8 @@ from gpytorch.variational import CholeskyVariationalDistribution, VariationalStr
 from torch import nn
 from torch.nn import Linear
 
+from models.base_nn import hidden_size_extract
+
 
 class DeepGPHiddenLayer(DeepGPLayer):
     def __init__(self, input_dims, output_dims, num_inducing=128, mean_type='constant'):
@@ -97,14 +99,7 @@ class DeepGPHiddenLayer(DeepGPLayer):
 class DeepGaussianProcess(DeepGP):
     def __init__(self, input_size, output_size, num_inducing=128, **kwargs):
         # pass hidden layer sizes as separate arguments as well as array
-        if 'hidden_size' not in kwargs:
-            hidden_size = []
-            for i in range(0, 6):
-                key = 'hidden_size_%d' % i
-                if key in kwargs and kwargs[key] != 0:
-                    hidden_size.append(kwargs[key])
-        else:
-            hidden_size = kwargs['hidden_size']
+        hidden_size = hidden_size_extract(kwargs)
 
         self.hidden_size = hidden_size
         self.hidden_size.append(output_size)

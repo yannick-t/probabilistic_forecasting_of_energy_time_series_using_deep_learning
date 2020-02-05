@@ -3,11 +3,16 @@ from skopt.space import Real, Integer
 from skorch.callbacks import EarlyStopping
 
 from models.concrete_dropout import ConcreteDropoutNN
+from models.deep_ensemble_sklearn import DeepEnsemble
+from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from models.simple_nn import SimpleNN
+from models.skorch_wrappers.bnn_skorch import BNNSkorch
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
+from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
+from models.torch_bnn import TorchBNN
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 from util.data.data_src_tools import load_opsd_de_load_daily, prepare_opsd_daily
 from hyperparameter_opt.bayesian_optimization import bayesian_optimization, mse_scorer, crps_scorer
@@ -26,10 +31,90 @@ x_full, y_full, x_train, y_train, x_test, y_test, scaler = prepare_opsd_daily(nu
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    fnp_bo()
+    deep_gp_bo()
+
+
+def deep_gp_bo():
+    # TODO: fix
+    dgp = DeepGPSkorch(
+        module=DeepGaussianProcess,
+        module__input_size=x_train.shape[-1],
+        module__output_size=y_train.shape[-1] * 2,
+        module__num_inducing=128,
+        max_epochs=1000,
+        batch_size=256,
+        train_split=None,
+        optimizer=torch.optim.Adam,
+        num_data=x_train.shape[0],
+        device=device)
+
+    space = {'lr': Real(0.001, 0.03, 'log-uniform'),
+             'module__hidden_size_0': Integer(1, 4),
+             'module__hidden_size_1': Integer(1, 8),
+             'module__hidden_size_2': Integer(1, 4),
+             'module__num_inducing': Integer(16, 512),
+             }
+
+    bayesian_optimization(dgp, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=512)
+
+
+def bnn_bo():
+    # TODO: fix
+    bnn = BNNSkorch(
+        module=TorchBNN,
+        module__input_size=x_train.shape[-1],
+        module__output_size=y_train.shape[-1] * 2,
+        module__prior_mu=0,
+        module__prior_sigma=0.4,
+        sample_count=30,
+        train_split=None,
+        max_epochs=5000,
+        batch_size=1024,
+        optimizer=torch.optim.Adam,
+        criterion=HeteroscedasticLoss,
+        device=device)
+
+    space = {'lr': Real(0.001, 0.03, 'log-uniform'),
+             'module__hidden_size_0': Integer(16, 256),
+             'module__hidden_size_1': Integer(16, 256),
+             'module__hidden_size_2': Integer(1, 256),
+             'module__hidden_size_3': Integer(1, 256),
+             'module__prior_mu': Real(-10, 10),
+             'module__prior_sigma': Real(0.01, 10),
+             # 'module__hidden_size_4': Integer(1, 1024),
+             # 'module__hidden_size_5': Integer(1, 1024),
+             }
+
+    bayesian_optimization(bnn, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=512)
+
+
+def deep_ens_bo():
+    # TODO: fix
+    deep_ens = DeepEnsemble(
+        input_size=x_train.shape[-1],
+        output_size=y_train.shape[-1] * 2,
+        lr=0.001,
+        max_epochs=2000,
+        batch_size=1024,
+        optimizer=torch.optim.Adam,
+        criterion=HeteroscedasticLoss,
+        device=device
+    )
+
+    space = {'lr': Real(0.01, 0.1, 'log-uniform'),
+             'module__hidden_size_0': Integer(16, 1024),
+             'module__hidden_size_1': Integer(16, 1024),
+             'module__hidden_size_2': Integer(1, 1024),
+             'module__hidden_size_3': Integer(1, 1024),
+             # 'module__hidden_size_4': Integer(1, 1024),
+             # 'module__hidden_size_5': Integer(1, 1024),
+             }
+
+    bayesian_optimization(deep_ens, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=512)
 
 
 def fnp_bo():
+    # TODO: fix
     cv = 5
     fnp = RegressionFNPSkorch(
         module=RegressionFNP,
