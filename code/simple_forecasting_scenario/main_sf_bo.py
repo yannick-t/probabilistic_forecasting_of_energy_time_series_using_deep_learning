@@ -31,7 +31,7 @@ x_full, y_full, x_train, y_train, x_test, y_test, scaler = prepare_opsd_daily(nu
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    deep_gp_bo()
+    fnp_bo()
 
 
 def deep_gp_bo():
@@ -129,12 +129,12 @@ def fnp_bo():
     )
 
     space = {
-        'lr': Real(0.001, 0.04, 'log-uniform'),
-        'max_epochs': Integer(40, 220),
-        'batch_size': [64, 128, 256],
+        'lr': Real(0.001, 0.01, 'log-uniform'),
+        'max_epochs': Integer(40, 150),
+        'batch_size': [32, 64, 128],
         'module__dim_u': Integer(1, 16),
         'module__dim_z': Integer(8, 128),
-        'module__fb_z': Real(0, 4.0),
+        'module__fb_z': Real(0, 2.0),
         'reference_set_size_ratio': Real(0.01, 0.4),
         'module__hidden_size_enc_0': Integer(64, 256),
         'module__hidden_size_enc_1': Integer(64, 512),
@@ -144,7 +144,7 @@ def fnp_bo():
         'module__hidden_size_dec_2': Integer(1, 256),
     }
 
-    bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=512, cv=cv)
+    bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=1024, cv=cv)
 
 
 def concrete_bo():

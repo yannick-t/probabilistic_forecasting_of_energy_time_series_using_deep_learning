@@ -113,6 +113,7 @@ class RegressionFNP(nn.Module):
         # get A
         A = sample_bipartite(u[XR.size(0):], u[0:XR.size(0)], self.pairwise_g, training=self.training)
 
+
         # get Z
         qz_mean_all, qz_logscale_all = torch.split(self.q_z(H_all), self.dim_z, 1)
         qz = Normal(qz_mean_all, qz_logscale_all)
@@ -178,6 +179,11 @@ class RegressionFNP(nn.Module):
         u = pu.rsample()
 
         A = sample_bipartite(u[XR.size(0):], u[0:XR.size(0)], self.pairwise_g, training=False)
+        if A is None:
+            # workaround for hyperparameter optimization to keep going if fnp produces
+            # nan here for some reason
+            print('nan in logits')
+            return torch.zeros([x_new.shape[0], 1])
 
         pz_mean_all, pz_logscale_all = torch.split(self.q_z(H_all[0:XR.size(0)]), self.dim_z, 1)
         cond_y_mean, cond_y_logscale = torch.split(self.trans_cond_y(yR), self.dim_z, 1)

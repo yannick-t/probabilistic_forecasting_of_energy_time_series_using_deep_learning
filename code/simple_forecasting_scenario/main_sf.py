@@ -41,7 +41,7 @@ def main():
     load_train(concrete, x_train, y_train, 'concrete', load_saved=True)
 
     fnp = fnp_init(x_train, y_train)
-    load_train(fnp, x_train, y_train, 'fnp', load_saved=True)
+    load_train(fnp, x_train, y_train, 'fnp', load_saved=False)
     fnp.choose_r(x_train, y_train)  # set up reference set in case the model was loaded
 
     deep_ens = deep_ensemble_init(x_train, y_train)
@@ -49,8 +49,8 @@ def main():
 
     pred_means, pred_vars = predict_transform_multiple([concrete, fnp, deep_ens], x_test, scaler)
     _, pred_ood_vars = predict_transform_multiple([concrete, fnp, deep_ens], x_ood_rand, scaler)
-
-    evaluate_multiple(['Concrete', 'FNP', 'Deep Ens.'], pred_means, pred_vars, y_test_orig, pred_ood_vars)
+    #
+    # evaluate_multiple(['Concrete', 'FNP', 'Deep Ens.'], pred_means, pred_vars, y_test_orig, pred_ood_vars)
 
 
 def fnp_init(x_train, y_train):
@@ -58,18 +58,20 @@ def fnp_init(x_train, y_train):
         module=RegressionFNP,
         module__dim_x=x_train.shape[-1],
         module__dim_y=y_train.shape[-1],
-        module__hidden_size_enc=[20],
-        module__hidden_size_dec=[20],
-        module__dim_u=3,
-        module__dim_z=50,
-        module__fb_z=1.0,
+        module__hidden_size_enc=[256, 512, 256],
+        module__hidden_size_dec=[256, 512, 256],
+        module__dim_u=16,
+        module__dim_z=8,
+        module__fb_z=2.0,
         optimizer=torch.optim.Adam,
         device=device,
         seed=42,
-        max_epochs=10,
-        batch_size=64,
-        reference_set_size_ratio=0.1,
-        train_size=x_train.size)
+        max_epochs=2,
+        batch_size=32,
+        reference_set_size_ratio=0.01,
+        train_size=x_train.size,
+        train_split=None
+    )
 
     return fnp
 

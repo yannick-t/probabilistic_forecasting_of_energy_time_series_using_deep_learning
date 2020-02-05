@@ -138,7 +138,11 @@ def sample_bipartite(Z1, Z2, g, training=True, temperature=0.3):
         p_edges = LogitRelaxedBernoulli(logits=logits, temperature=temperature)
         A_vals = torch.sigmoid(p_edges.rsample())
     else:
-        p_edges = Bernoulli(logits=logits)
+        # workaround for hyperparameter optimization to keep going if fnp produces
+        # nan here for some reason
+        if torch.isnan(logits).any():
+            return None
+        p_edges = Bernoulli(logits=logits, validate_args=True)
         A_vals = p_edges.sample()
 
     # embed the values to the adjacency matrix
