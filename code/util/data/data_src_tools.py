@@ -27,6 +27,8 @@ def load_opsd_de_load_daily():
 
 def prepare_opsd_daily(num_prev_val, num_pred_val):
     dataset = load_opsd_de_load_daily()
+    # use GW for convenience and readability later, also the standard-scaled values are smaller
+    dataset = dataset / 1000
     scaler = StandardScaler()
     dataset['DE_load_actual_entsoe_power_statistics'] = \
         scaler.fit_transform(np.array(dataset['DE_load_actual_entsoe_power_statistics']).reshape(-1, 1)).squeeze()

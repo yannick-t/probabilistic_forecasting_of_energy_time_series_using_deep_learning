@@ -6,7 +6,7 @@ def main():
     fig = plt.figure()
     plt.style.use('seaborn-whitegrid')
 
-    dataset = pandas.read_csv('../../../../time_series_60min_singleindex.csv', header=0, low_memory=False,
+    dataset = pandas.read_csv('../../time_series_60min_singleindex.csv', header=0, low_memory=False,
                               infer_datetime_format=True, parse_dates=['utc_timestamp'], index_col=['utc_timestamp'])
 
     daily_avg_power = dataset['DE_load_actual_entsoe_power_statistics']

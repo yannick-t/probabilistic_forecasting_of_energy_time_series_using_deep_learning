@@ -183,7 +183,11 @@ class RegressionFNP(nn.Module):
             # workaround for hyperparameter optimization to keep going if fnp produces
             # nan here for some reason
             print('nan in logits')
-            return torch.zeros([x_new.shape[0], 1])
+            return torch.stack(
+                [torch.zeros([x_new.shape[0], self.dim_y]),
+                torch.ones([x_new.shape[0], self.dim_y])],
+                dim=-1
+            )
 
         pz_mean_all, pz_logscale_all = torch.split(self.q_z(H_all[0:XR.size(0)]), self.dim_z, 1)
         cond_y_mean, cond_y_logscale = torch.split(self.trans_cond_y(yR), self.dim_z, 1)
