@@ -6,26 +6,26 @@ import numpy as np
 
 def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     count = len(pred_y_mean)
-    fig, axes = plt.subplots(1, count, sharey='row', figsize=(9, 3.25))
+    fig, axes = plt.subplots(1, count, sharey='row', figsize=(6, 1.8))
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
         ax = axes[counter]
         ax.set_title(name)
         probabilistic_calibration(pmean, pvar, y_true, ax)
-    fig.text(0.04, 0.5, 'Relative Frequency', va='center', rotation='vertical')
+    fig.text(0.016, 0.5, 'Relative Frequency', va='center', rotation='vertical')
     plt.subplots_adjust(left=0.1)
     plt.show()
 
 
 def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     count = len(pred_y_mean)
-    fig, axes = plt.subplots(1, count, sharey='row', figsize=(9, 3.25))
+    fig, axes = plt.subplots(1, count, sharey='row', figsize=(6, 1.8))
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
         ax = axes[counter]
         ax.set_title(name)
 
         marginal_calibration(pmean, pvar, y_true, ax)
-    fig.text(0.04, 0.5, 'Diff. emp. CDF avg. Pred. CDF', va='center', rotation='vertical')
-    plt.subplots_adjust(left=0.1)
+    fig.text(0.014, 0.5, 'CDF Difference', va='center', rotation='vertical')
+    plt.subplots_adjust(left=0.11)
     plt.show()
 
 

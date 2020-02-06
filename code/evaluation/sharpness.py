@@ -4,11 +4,12 @@ import numpy as np
 
 
 def sharpness_plot_multiple(names, pred_y_var):
-    fig, ax = plt.subplots(figsize=(10, 3.25))
-    ax.set_ylabel('Width')
+    fig, ax = plt.subplots(figsize=(6, 3.0))
+    plt.subplots_adjust(bottom=0.27, left=0.05, top=0.93)
+    # ax.set_ylabel('Width')
 
     sharpness_plot_(pred_y_var, ax, names)
-    plt.subplots_adjust(left=0.1)
+    # plt.subplots_adjust(left=0.1)
 
     plt.show()
 
@@ -34,7 +35,7 @@ def sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
 
 def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars):
     count = len(names)
-    fig, axes = plt.subplots(1, count, sharey='row', figsize=(9, 3.25))
+    fig, axes = plt.subplots(1, count, sharey='row', figsize=(6, 1.8))
 
     for counter, (name, p_test_var, p_ood_var) in enumerate(zip(names, pred_test_vars, pred_ood_vars)):
         ax = axes[counter]
@@ -72,7 +73,7 @@ def sharpness_plot_(pred_y_var, ax, names=None, scaler=None):
     # Journal of the Royal Statistical Society: Series B (Statistical Methodology), 69(2), 243-268.")
     ax.boxplot([q for q in widths], showfliers=False, whis=[5, 95])
     if names is not None:
-        ax.set_xticklabels(np.concatenate([[name + ' 50%' for name in names], [name + ' 90%' for name in names]]))
+        ax.set_xticklabels(np.concatenate([[name + ' 50%' for name in names], [name + ' 90%' for name in names]]), rotation=45)
     else:
         ax.set_xticklabels(['50%', '90%'])
 
