@@ -101,7 +101,7 @@ def simple_nn_init(x_train, y_train):
         module__hidden_size=[32, 16],
         lr=0.01,
         batch_size=1024,
-        max_epochs=1000,
+        max_epochs=150,
         # train_split=None,
         optimizer=torch.optim.Adam,
         criterion=torch.nn.MSELoss,
