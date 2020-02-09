@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 from sklearn.model_selection import train_test_split
+from skorch.callbacks import EarlyStopping
 
 from evaluation.calibration import probabilistic_calibration, interval_coverage, marginal_calibration, \
     probabilistic_calibration_multiple, marginal_calibration_multiple
@@ -92,6 +93,7 @@ def main():
 
 
 def simple_nn_init(x_train, y_train):
+    es = EarlyStopping(patience=75)
     simple_nn = BaseNNSkorch(
         module=SimpleNN,
         module__input_size=x_train.shape[-1],
@@ -99,12 +101,13 @@ def simple_nn_init(x_train, y_train):
         module__hidden_size=[32, 16],
         lr=0.01,
         batch_size=1024,
-        max_epochs=100,
-        train_split=None,
+        max_epochs=1000,
+        # train_split=None,
         optimizer=torch.optim.Adam,
         criterion=torch.nn.MSELoss,
         device=device,
-        verbose=1
+        verbose=1,
+        callbacks=[es]
     )
 
     return simple_nn

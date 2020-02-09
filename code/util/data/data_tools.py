@@ -38,28 +38,44 @@ def preprocess_load_data_forec(dataframe):
     dataframe['load'] = \
         scaler.fit_transform(np.array(dataframe['load']).reshape(-1, 1)).squeeze()
 
-    dataset_x = np.zeros([dataframe.size, 5])
-    dataset_y = np.zeros([dataframe.size, 1])
+    # adjust for lagged variables so there are lagged variables for all targets
+    dataframe_adj = dataframe[dataframe.index[0] + timedelta(days=7): dataframe.index[-1]]
 
-    dataset_y[:, 0] = np.array(dataframe['load'])
+    dataset_x = np.zeros([dataframe_adj.size, 8])
+    dataset_y = np.zeros([dataframe_adj.size, 1])
+
+    dataset_y[:, 0] = np.array(dataframe_adj['load'])
 
     # time of year, value between 0 and 1, high in summer, low in winter
-    dataset_x[:, 0] = np.array([time.timetuple().tm_yday - 1 for time in dataframe.index])
+    dataset_x[:, 0] = np.array([time.timetuple().tm_yday - 1 for time in dataframe_adj.index])
     dataset_x[:, 0] = (np.sin(((dataset_x[:, 0] / 365) * 2 * np.pi) - np.pi / 2) + 1) * 3
     # time of day, value between 0 and 1, high in mid day, low at night
-    dataset_x[:, 1] = np.array([time.timetuple().tm_hour for time in dataframe.index])
-    dataset_x[:, 1] = dataset_x[:, 1] + np.array([time.timetuple().tm_min / 60 for time in dataframe.index])
+    dataset_x[:, 1] = np.array([time.timetuple().tm_hour for time in dataframe_adj.index])
+    dataset_x[:, 1] = dataset_x[:, 1] + np.array([time.timetuple().tm_min / 60 for time in dataframe_adj.index])
     dataset_x[:, 1] = (np.sin(((dataset_x[:, 1] / 24) * 2 * np.pi) - np.pi / 2) + 1) * 2
     # day encoding weekday
-    dataset_x[:, 2] = np.array([1 if time.isoweekday() > 5 else 0 for time in dataframe.index])
-    # day encoding holidays TODO: special day adjacency (bridging etc.)
-    dataset_x[:, 3] = np.array([1 if cal.is_holiday(time) else 0 for time in dataframe.index])
+    dataset_x[:, 2] = np.array([1 if time.isoweekday() > 5 else 0 for time in dataframe_adj.index])
+
+    # day encoding special days similar to
+    # Arora, S., & Taylor, J. W. (2018).
+    # Rule-based autoregressive moving average models for forecasting load on special days: A case study for France.
+    # European Journal of Operational Research, 266(1), 259-268.
+    dataset_x[:, 3] = np.array([1 if cal.is_holiday(time) else 0 for time in dataframe_adj.index])
     # special day adjacent days
     dataset_x[:, 4] = np.array([1 if
                                 cal.is_holiday(time + timedelta(days=1)) or cal.is_holiday(time - timedelta(days=1))
-                                else 0 for time in dataframe.index])
-    # lagged variables # TODO: lagged variables
-    # same time day before
+                                else 0 for time in dataframe_adj.index])
+    # bridging proximity days i.e., friday and monday
+    dataset_x[:, 5] = np.array([1 if
+                                (cal.is_holiday(time + timedelta(days=1)) or cal.is_holiday(time - timedelta(days=1))) and
+                                (time.isoweekday == 1 or time.isoweekday == 5)
+                                else 0 for time in dataframe_adj.index])
+
+    # lagged variables
+    # value for same time day before
+    dataset_x[:, 6] = np.array([dataframe.loc[time - timedelta(days=1)] for time in dataframe_adj.index]).squeeze()
+    # value for same time week before
+    dataset_x[:, 7] = np.array([dataframe.loc[time - timedelta(days=7)] for time in dataframe_adj.index]).squeeze()
 
     return dataset_x, dataset_y, scaler
 
