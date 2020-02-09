@@ -1,3 +1,5 @@
+import os
+
 import pandas
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -6,7 +8,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from util.data.data_tools import convert_data_overlap
 
 
-def process_opsd_de_load():
+def process_opsd_de_load_to_daily():
     dataset = pandas.read_csv('../time_series_60min_singleindex.csv', header=0, low_memory=False,
                        infer_datetime_format=True, parse_dates=['utc_timestamp'], index_col=['utc_timestamp'])
 
@@ -23,6 +25,21 @@ def load_opsd_de_load_daily():
     dataset = pandas.read_csv('../../DE_load_actual_entsoe_power_statistics_daily_avg.csv', header=0,
                               infer_datetime_format=True, parse_dates=[0], index_col=[0])
     return dataset
+
+
+def load_opsd_de_load_statistics():
+    load_processed_path = '../../opsd_de_load_statistics_60_clean.csv'
+    if not os.path.exists(load_processed_path):
+        dataset = pandas.read_csv('../../time_series_60min_singleindex.csv', header=0, low_memory=False,
+                                  infer_datetime_format=True, parse_dates=['utc_timestamp'], index_col=['utc_timestamp'])
+        dataset.rename(columns={'DE_load_actual_entsoe_power_statistics': 'load'}, inplace=True)
+        load_de_statistic = dataset[['load']]
+        load_de_statistic = load_de_statistic.dropna()
+        load_de_statistic.to_csv(load_processed_path)
+    else:
+        load_de_statistic = pandas.read_csv(load_processed_path, header=0,
+                                            infer_datetime_format=True, parse_dates=[0], index_col=[0])
+    return load_de_statistic
 
 
 def prepare_opsd_daily(num_prev_val, num_pred_val):

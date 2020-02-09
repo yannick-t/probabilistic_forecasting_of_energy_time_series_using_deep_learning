@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 from evaluation.calibration import probabilistic_calibration, interval_coverage, marginal_calibration, \
     probabilistic_calibration_multiple, marginal_calibration_multiple
@@ -20,66 +21,69 @@ from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from models.torch_bnn import TorchBNN
 from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
-from util.data.data_src_tools import load_opsd_de_load_daily, prepare_opsd_daily
-from util.data.data_tools import convert_data_overlap, inverse_transform_normal
+from util.data.data_src_tools import load_opsd_de_load_daily, prepare_opsd_daily, load_opsd_de_load_statistics
+from util.data.data_tools import convert_data_overlap, inverse_transform_normal, preprocess_load_data_forec
+import time
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
 
 device = torch.device('cuda' if use_cuda else 'cpu')
 
-num_prev_val = 7
-num_pred_val = 1
-
 model_folder = './trained_models/'
-model_prefix = 'simple_forecasting_'
-
-import time
+model_prefix = 'load_forecasting_'
 
 
 def main():
-    x_full, y_full, x_train, y_train, x_test, y_test, scaler = prepare_opsd_daily(num_prev_val, num_pred_val)
+    dataset = load_opsd_de_load_statistics()
+    dataset_x, dataset_y, scaler = preprocess_load_data_forec(dataset)
+    x_train, x_test, y_train, y_test = train_test_split(dataset_x, dataset_y, test_size=0.1, shuffle=False)
+
     np.random.seed(333)
     x_ood_rand = np.random.uniform(-3, 3, x_test.shape)
     y_test_orig = scaler.inverse_transform(y_test)
 
     simple_nn = simple_nn_init(x_train, y_train)
-    train_time_simple = load_train(simple_nn, x_train, y_train, 'simple_nn', load_saved=True)
+    train_time_simple = load_train(simple_nn, x_train, y_train, 'simple_nn', load_saved=False)
 
-    concrete = concrete_init(x_train, y_train)
-    train_time_conc = load_train(concrete, x_train, y_train, 'concrete', load_saved=True)
-
-    fnp = fnp_init(x_train, y_train)
-    train_time_fnp = load_train(fnp, x_train, y_train, 'fnp', load_saved=True)
-    fnp.choose_r(x_train, y_train)  # set up reference set in case the model was loaded
-
-    deep_ens = deep_ensemble_init(x_train, y_train)
-    train_time_deep_ens = load_train(deep_ens, x_train, y_train, 'deep_ens', load_saved=True)
-
-    bnn = bnn_init(x_train, y_train)
-    train_time_bnn = load_train(bnn, x_train, y_train, 'bnn', load_saved=True)
-
-    dgp = deep_gp_init(x_train, y_train)
-    train_time_deepgp = load_train(dgp, x_train, y_train, 'deep_gp', load_saved=True)
-
-    names = ['Concrete', 'FNP', 'Deep Ens.', 'BNN', 'Deep GP']
-    models = [concrete, fnp, deep_ens, bnn, dgp]
-
-    pred_means, pred_vars, pred_times = predict_transform_multiple(models, names, x_test, scaler)
-    _, pred_ood_vars, _ = predict_transform_multiple(models, names, x_ood_rand, scaler)
-
+    # concrete = concrete_init(x_train, y_train)
+    # train_time_conc = load_train(concrete, x_train, y_train, 'concrete', load_saved=True)
+    #
+    # fnp = fnp_init(x_train, y_train)
+    # train_time_fnp = load_train(fnp, x_train, y_train, 'fnp', load_saved=True)
+    # fnp.choose_r(x_train, y_train)  # set up reference set in case the model was loaded
+    #
+    # deep_ens = deep_ensemble_init(x_train, y_train)
+    # train_time_deep_ens = load_train(deep_ens, x_train, y_train, 'deep_ens', load_saved=True)
+    #
+    # bnn = bnn_init(x_train, y_train)
+    # train_time_bnn = load_train(bnn, x_train, y_train, 'bnn', load_saved=True)
+    #
+    # dgp = deep_gp_init(x_train, y_train)
+    # train_time_deepgp = load_train(dgp, x_train, y_train, 'deep_gp', load_saved=True)
+    #
+    # names = ['Concrete', 'FNP', 'Deep Ens.', 'BNN', 'Deep GP']
+    # models = [concrete, fnp, deep_ens, bnn, dgp]
+    #
+    # pred_means, pred_vars, pred_times = predict_transform_multiple(models, names, x_test, scaler)
+    # _, pred_ood_vars, _ = predict_transform_multiple(models, names, x_ood_rand, scaler)
+    #
     start = time.time_ns()
     pred_simple = simple_nn.predict(x_test)
     end = time.time_ns()
     pred_time_simple = end - start
     pred_simple = scaler.inverse_transform(pred_simple)
+    #
+    # print('train times: %d, %d, %d, %d, %d, %d' % (train_time_simple,
+    #     train_time_conc, train_time_fnp, train_time_deep_ens, train_time_bnn, train_time_deepgp))
+    # print('pred times: %d, %d, %d, %d, %d, %d' % (pred_time_simple,
+    #     pred_times[0], pred_times[1], pred_times[2], pred_times[3], pred_times[4]))
+    #
+    # evaluate_multiple(names, pred_means, pred_vars, y_test_orig, pred_ood_vars)
 
-    print('train times: %d, %d, %d, %d, %d, %d' % (train_time_simple,
-        train_time_conc, train_time_fnp, train_time_deep_ens, train_time_bnn, train_time_deepgp))
-    print('pred times: %d, %d, %d, %d, %d, %d' % (pred_time_simple,
-        pred_times[0], pred_times[1], pred_times[2], pred_times[3], pred_times[4]))
-
-    evaluate_multiple(names, pred_means, pred_vars, y_test_orig, pred_ood_vars)
+    ax = plt.subplot(1, 1, 1)
+    plot_test_data(pred_simple, np.ones_like(pred_simple) * 0.1, scaler.inverse_transform(y_test), ax)
+    plt.show()
 
     print('###############################')
     print('Simple NN:')
@@ -92,10 +96,10 @@ def simple_nn_init(x_train, y_train):
         module=SimpleNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1],
-        module__hidden_size=[64, 128, 19, 6],
-        lr=0.018,
+        module__hidden_size=[32, 16],
+        lr=0.01,
         batch_size=1024,
-        max_epochs=3000,
+        max_epochs=100,
         train_split=None,
         optimizer=torch.optim.Adam,
         criterion=torch.nn.MSELoss,
