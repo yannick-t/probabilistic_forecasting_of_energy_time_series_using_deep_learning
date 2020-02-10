@@ -34,7 +34,11 @@ def preprocess_load_data_forec(dataframe):
 
     # use GW for convenience and readability later, also the standard-scaled values are smaller
     dataframe = dataframe / 1000
-    # substract offset profiles, to make prediction easier
+    # de-seasonalize days to some degree by substracting load values from same day last week
+    dataframe_old = dataframe.copy()
+    dataframe_old.index = dataframe.index.shift(freq=timedelta(days=7), periods=1)
+    offset = dataframe_old[dataframe_old.index[0]: dataframe_old.index[-1] - timedelta(days=7)]
+    dataframe = dataframe[dataframe.index[0] + timedelta(days=7): dataframe.index[-1]] - offset
     # standard scale
     scaler = StandardScaler()
     dataframe['load'] = \
@@ -42,6 +46,7 @@ def preprocess_load_data_forec(dataframe):
 
     # adjust for lagged variables so there are lagged variables for all targets
     dataframe_adj = dataframe[dataframe.index[0] + timedelta(days=7): dataframe.index[-1]]
+    offset = offset[offset.index[0] + timedelta(days=7): offset.index[-1]]
 
     dataset_y = np.zeros([dataframe_adj.size, 1])
 
@@ -51,12 +56,12 @@ def preprocess_load_data_forec(dataframe):
     # time of year, value between 0 and 1, high in summer, low in winter
     year_day = np.array([time.timetuple().tm_yday - 1 for time in dataframe_adj.index])
     dataset_x_arrays.append((np.sin(((year_day / 365) * 2 * np.pi) - np.pi / 2) + 1) * 3)
-    dataset_x_arrays.append((np.cos(((year_day / 365) * 2 * np.pi) - np.pi / 2) + 1) * 3)  # deriv. of time of year sin
+    dataset_x_arrays.append((np.cos(((year_day / 365) * 2 * np.pi) - np.pi / 2) + 1) * 3)  # diff. of time of year sin
     # time of day, value between 0 and 1, high in mid day, low at night
     day_hour = np.array([time.timetuple().tm_hour for time in dataframe_adj.index])
     day_hour = day_hour + np.array([time.timetuple().tm_min / 60 for time in dataframe_adj.index])
     dataset_x_arrays.append((np.sin(((day_hour / 24) * 2 * np.pi) - np.pi / 2) + 1) * 2)
-    dataset_x_arrays.append((np.cos(((day_hour / 24) * 2 * np.pi) - np.pi / 2) + 1) * 2)  # deriv. of time of day sin
+    dataset_x_arrays.append((np.cos(((day_hour / 24) * 2 * np.pi) - np.pi / 2) + 1) * 2)  # diff. of time of day sin
 
     # day encoding weekday
     dataset_x_arrays.append(np.array([1 if time.isoweekday() > 5 else 0 for time in dataframe_adj.index]))
@@ -77,7 +82,7 @@ def preprocess_load_data_forec(dataframe):
                                 else 0 for time in dataframe_adj.index]))
 
     # lagged variables
-    # values for same time n-days before
+    # values for same time n-days before  TODO: optimize this
     dataset_x_arrays.append(np.array([dataframe.loc[time - timedelta(days=1)] for time in dataframe_adj.index]).squeeze())
     dataset_x_arrays.append(np.array([dataframe.loc[time - timedelta(days=2)] for time in dataframe_adj.index]).squeeze())
     dataset_x_arrays.append(np.array([dataframe.loc[time - timedelta(days=3)] for time in dataframe_adj.index]).squeeze())
@@ -89,7 +94,7 @@ def preprocess_load_data_forec(dataframe):
     dataset_x = np.stack(dataset_x_arrays, axis=-1)
     assert dataset_x.shape == (dataframe_adj.size, 14)
 
-    return dataset_x, dataset_y, scaler
+    return dataset_x, dataset_y, scaler, np.array(offset)
 
 
 def inverse_transform_normal(mean, std, scaler):

@@ -1,3 +1,5 @@
+import os
+
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
@@ -22,7 +24,8 @@ from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from models.torch_bnn import TorchBNN
 from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
-from util.data.data_src_tools import load_opsd_de_load_daily, prepare_opsd_daily, load_opsd_de_load_statistics
+from util.data.data_src_tools import load_opsd_de_load_statistics, load_opsd_de_load_transparency, \
+    load_opsd_de_load_transparency_dataset, load_opsd_de_load_statistics_dataset
 from util.data.data_tools import convert_data_overlap, inverse_transform_normal, preprocess_load_data_forec
 import time
 
@@ -36,13 +39,13 @@ model_prefix = 'load_forecasting_'
 
 
 def main():
-    dataset = load_opsd_de_load_statistics()
-    dataset_x, dataset_y, scaler = preprocess_load_data_forec(dataset)
-    x_train, x_test, y_train, y_test = train_test_split(dataset_x, dataset_y, test_size=0.1, shuffle=False)
+    dataset_x, dataset_y, scaler, offset = load_opsd_de_load_statistics_dataset(reprocess=False)
+    x_train, x_test, y_train, y_test, offset_train, offset_test = train_test_split(dataset_x, dataset_y, offset,
+                                                                                   test_size=0.1, shuffle=False)
 
     np.random.seed(333)
     x_ood_rand = np.random.uniform(-3, 3, x_test.shape)
-    y_test_orig = scaler.inverse_transform(y_test)
+    y_test_orig = scaler.inverse_transform(y_test) + offset_test
 
     simple_nn = simple_nn_init(x_train, y_train)
     train_time_simple = load_train(simple_nn, x_train, y_train, 'simple_nn', load_saved=False)
@@ -73,7 +76,7 @@ def main():
     pred_simple = simple_nn.predict(x_test)
     end = time.time_ns()
     pred_time_simple = end - start
-    pred_simple = scaler.inverse_transform(pred_simple)
+    pred_simple = scaler.inverse_transform(pred_simple) + offset_test
     #
     # print('train times: %d, %d, %d, %d, %d, %d' % (train_time_simple,
     #     train_time_conc, train_time_fnp, train_time_deep_ens, train_time_bnn, train_time_deepgp))
@@ -83,7 +86,7 @@ def main():
     # evaluate_multiple(names, pred_means, pred_vars, y_test_orig, pred_ood_vars)
 
     ax = plt.subplot(1, 1, 1)
-    plot_test_data(pred_simple, np.ones_like(pred_simple) * 0.1, scaler.inverse_transform(y_test), ax)
+    plot_test_data(pred_simple, np.ones_like(pred_simple) * 0.1, y_test_orig, ax)
     plt.show()
 
     print('###############################')
@@ -99,15 +102,15 @@ def simple_nn_init(x_train, y_train):
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1],
         module__hidden_size=[32, 16],
-        lr=0.01,
+        lr=0.002,
         batch_size=1024,
-        max_epochs=150,
+        max_epochs=120,
         # train_split=None,
         optimizer=torch.optim.Adam,
         criterion=torch.nn.MSELoss,
         device=device,
         verbose=1,
-        callbacks=[es]
+        # callbacks=[es]
     )
 
     return simple_nn
@@ -245,7 +248,7 @@ def predict_transform_multiple(models, names, x_test, scaler):
     return pred_means, pred_vars, times
 
 
-def predict_transform(model, x_test, scaler, model_name=""):
+def predict_transform(model, x_test, scaler, offset_test, model_name=""):
     # predict and inverse transform
     start = time.time_ns()
     pred_y = model.predict(x_test)
@@ -257,6 +260,7 @@ def predict_transform(model, x_test, scaler, model_name=""):
 
     pred_y_mean, pred_y_std = inverse_transform_normal(pred_y_mean, np.sqrt(pred_y_var), scaler)
     pred_y_var = pred_y_std ** 2
+    pred_y_mean = pred_y_mean + offset_test
 
     return pred_y_mean, pred_y_var, (end - start)
 

@@ -1,4 +1,5 @@
 import torch
+from sklearn.model_selection import train_test_split
 from skopt.space import Real, Integer
 from skorch.callbacks import EarlyStopping
 
@@ -14,27 +15,26 @@ from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from models.torch_bnn import TorchBNN
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
-from util.data.data_src_tools import load_opsd_de_load_daily, prepare_opsd_daily
+from util.data.data_src_tools import load_opsd_de_load_daily, prepare_opsd_daily, load_opsd_de_load_transparency
 from hyperparameter_opt.bayesian_optimization import bayesian_optimization, mse_scorer, crps_scorer
+from util.data.data_tools import preprocess_load_data_forec
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
 
 device = torch.device('cuda' if use_cuda else 'cpu')
 
-num_prev_val = 7
-num_pred_val = 1
-
-x_full, y_full, x_train, y_train, x_test, y_test, scaler = prepare_opsd_daily(num_prev_val, num_pred_val)
-
 
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    deep_gp_bo()
+    dataset = load_opsd_de_load_transparency()
+    dataset_x, dataset_y, scaler = preprocess_load_data_forec(dataset)
+    x_train, x_test, y_train, y_test = train_test_split(dataset_x, dataset_y, test_size=0.1, shuffle=False)
+    deep_gp_bo(x_train, y_train, x_test, y_test)
 
 
-def deep_gp_bo():
+def deep_gp_bo(x_train, y_train, x_test, y_test):
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
         module__input_size=x_train.shape[-1],
@@ -58,7 +58,7 @@ def deep_gp_bo():
                           n_jobs=1)  # workaround for pickling error of gpytorch stuff, can't run prallel
 
 
-def bnn_bo():
+def bnn_bo(x_train, y_train, x_test, y_test):
     bnn = BNNSkorch(
         module=TorchBNN,
         module__input_size=x_train.shape[-1],
@@ -89,7 +89,7 @@ def bnn_bo():
     bayesian_optimization(bnn, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=512)
 
 
-def deep_ens_bo():
+def deep_ens_bo(x_train, y_train, x_test, y_test):
     deep_ens = DeepEnsemble(
         input_size=x_train.shape[-1],
         output_size=y_train.shape[-1] * 2,
@@ -113,7 +113,7 @@ def deep_ens_bo():
     bayesian_optimization(deep_ens, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=512)
 
 
-def fnp_bo():
+def fnp_bo(x_train, y_train, x_test, y_test):
     cv = 5
     fnp = RegressionFNPSkorch(
         module=RegressionFNP,
@@ -145,7 +145,7 @@ def fnp_bo():
     bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=1024, cv=cv)
 
 
-def concrete_bo():
+def concrete_bo(x_train, y_train, x_test, y_test):
     cv = 5
     concrete = ConcreteSkorch(module=ConcreteDropoutNN,
                               module__input_size=x_train.shape[-1],
@@ -175,7 +175,7 @@ def concrete_bo():
     bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=333, cv=cv)
 
 
-def simple_nn_bo():
+def simple_nn_bo(x_train, y_train, x_test, y_test):
     # simle nn as comparison, optimize hyperparameters using bayesian optimization
     es = EarlyStopping(patience=200)
     simple_nn = BaseNNSkorch(module=SimpleNN,
