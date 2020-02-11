@@ -1,8 +1,10 @@
+import datetime
 import os
 
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from skorch.callbacks import EarlyStopping
 
@@ -24,9 +26,8 @@ from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from models.torch_bnn import TorchBNN
 from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
-from util.data.data_src_tools import load_opsd_de_load_statistics, load_opsd_de_load_transparency, \
-    load_opsd_de_load_transparency_dataset, load_opsd_de_load_statistics_dataset
-from util.data.data_tools import convert_data_overlap, inverse_transform_normal, preprocess_load_data_forec
+from util.data.data_src_tools import load_opsd_de_load_statistics, load_opsd_de_load_transparency, load_opsd_de_load_dataset
+from util.data.data_tools import inverse_transform_normal, preprocess_load_data_forec
 import time
 
 use_cuda = True
@@ -39,16 +40,19 @@ model_prefix = 'load_forecasting_'
 
 
 def main():
-    dataset_x, dataset_y, scaler, offset = load_opsd_de_load_statistics_dataset(reprocess=False)
-    x_train, x_test, y_train, y_test, offset_train, offset_test = train_test_split(dataset_x, dataset_y, offset,
-                                                                                   test_size=0.1, shuffle=False)
+    dataset_x, dataset_y, scaler, offset, timestamp = load_opsd_de_load_dataset(type='transparency', reprocess=True)
+    x_train, x_test, y_train, y_test, offset_train, offset_test, timestamp_train, timestamp_test \
+        = train_test_split(dataset_x, dataset_y, offset, timestamp,
+                           test_size=0.2, shuffle=False)
 
     np.random.seed(333)
     x_ood_rand = np.random.uniform(-3, 3, x_test.shape)
     y_test_orig = scaler.inverse_transform(y_test) + offset_test
 
-    simple_nn = simple_nn_init(x_train, y_train)
-    train_time_simple = load_train(simple_nn, x_train, y_train, 'simple_nn', load_saved=False)
+    reg = simple_nn_init(x_train, y_train)
+    train_time_simple = load_train(reg, x_train, y_train, 'simple_nn', load_saved=False)
+
+    # reg = LinearRegression().fit(x_train, y_train)
 
     # concrete = concrete_init(x_train, y_train)
     # train_time_conc = load_train(concrete, x_train, y_train, 'concrete', load_saved=True)
@@ -73,10 +77,9 @@ def main():
     # _, pred_ood_vars, _ = predict_transform_multiple(models, names, x_ood_rand, scaler)
     #
     start = time.time_ns()
-    pred_simple = simple_nn.predict(x_test)
+    pred = reg.predict(x_test)
     end = time.time_ns()
-    pred_time_simple = end - start
-    pred_simple = scaler.inverse_transform(pred_simple) + offset_test
+    pred = scaler.inverse_transform(pred) + offset_test
     #
     # print('train times: %d, %d, %d, %d, %d, %d' % (train_time_simple,
     #     train_time_conc, train_time_fnp, train_time_deep_ens, train_time_bnn, train_time_deepgp))
@@ -86,13 +89,16 @@ def main():
     # evaluate_multiple(names, pred_means, pred_vars, y_test_orig, pred_ood_vars)
 
     ax = plt.subplot(1, 1, 1)
-    plot_test_data(pred_simple, np.ones_like(pred_simple) * 0.1, y_test_orig, ax)
+    plot_test_data(pred, np.ones_like(pred) * 0.1, y_test_orig, timestamp_test, ax)
+    # ax = plt.subplot(1, 2, 2)
+    # pred_simple_train = reg.predict(x_train)
+    # plot_test_data(pred_simple_train, np.ones_like(pred_simple_train) * 0.01, y_train, timestamp_train, ax)
     plt.show()
 
     print('###############################')
     print('Simple NN:')
-    print("RMSE: %.4f" % rmse(pred_simple, y_test_orig))
-    print("MAPE: %.2f" % mape(pred_simple, y_test_orig))
+    print("RMSE: %.4f" % rmse(pred, y_test_orig))
+    print("MAPE: %.2f" % mape(pred, y_test_orig))
 
 
 def simple_nn_init(x_train, y_train):
@@ -104,8 +110,8 @@ def simple_nn_init(x_train, y_train):
         module__hidden_size=[32, 16],
         lr=0.002,
         batch_size=1024,
-        max_epochs=120,
-        # train_split=None,
+        max_epochs=200,
+        train_split=None,
         optimizer=torch.optim.Adam,
         criterion=torch.nn.MSELoss,
         device=device,
@@ -332,11 +338,13 @@ def evaluate_single(pred_mean, pred_var, true_y):
     plt.show()
 
 
-def plot_test_data(pred_mean, pred_var, y_true, ax):
-    x = np.array(range(pred_mean.shape[0]))
+def plot_test_data(pred_mean, pred_var, y_true, timestamp, ax):
+    x = timestamp
 
-    ax.plot(y_true.squeeze(), color='blue')
-    ax.plot(pred_mean.squeeze(), color='orange')
+    ax.plot(x, y_true.squeeze(), color='blue')
+    ax.plot(x, pred_mean.squeeze(), color='orange')
+
+    ax.plot(x, (y_true.squeeze() - pred_mean.squeeze())**2, color='red')
 
     if pred_var is not None:
         std_deviations = np.sqrt(pred_var.squeeze())

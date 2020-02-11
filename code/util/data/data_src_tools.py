@@ -46,9 +46,17 @@ def load_opsd_de_load_transparency():
     return load_de_transparency
 
 
-def load_opsd_de_load_transparency_dataset(reprocess=False):
-    dataset_path = '../de_load_transparency_'
-    scaler_path = '../de_load_transparency_scaler.save'
+def load_opsd_de_load_dataset(type, reprocess=False):
+    assert type == 'transparency' or type == 'statistics'
+
+    if type == 'transparency':
+        load_fn = load_opsd_de_load_transparency
+        dataset_path = '../de_load_transparency_'
+        scaler_path = '../de_load_transparency_scaler.save'
+    elif type == 'statistics':
+        load_fn = load_opsd_de_load_statistics
+        dataset_path = '../de_load_statistics_'
+        scaler_path = '../de_load_statistics_scaler.save'
 
     if os.path.exists(scaler_path) and not reprocess:
         print('loading saved dataset')
@@ -56,44 +64,19 @@ def load_opsd_de_load_transparency_dataset(reprocess=False):
         dataset_x = np.loadtxt(dataset_path + 'x.csv', delimiter=',')
         dataset_y = np.loadtxt(dataset_path + 'y.csv', delimiter=',').reshape([-1, 1])
         offset = np.loadtxt(dataset_path + 'offset.csv', delimiter=',').reshape([-1, 1])
+        timestamp = np.loadtxt(dataset_path + 'timestamp.csv', delimiter=',', dtype='datetime64[ns]')
 
         scaler = joblib.load(scaler_path)
     else:
         # process dataset and save
-        dataset = load_opsd_de_load_transparency()
-        dataset_x, dataset_y, scaler, offset = preprocess_load_data_forec(dataset)
+        dataset = load_fn()
+        dataset_x, dataset_y, scaler, offset, timestamp = preprocess_load_data_forec(dataset)
 
         np.savetxt(dataset_path + 'x.csv', dataset_x, delimiter=',')
         np.savetxt(dataset_path + 'y.csv', dataset_y, delimiter=',')
         np.savetxt(dataset_path + 'offset.csv', offset, delimiter=',')
+        np.savetxt(dataset_path + 'timestamp.csv', timestamp, delimiter=',', fmt='%s')
 
         joblib.dump(scaler, scaler_path)
 
-    return dataset_x, dataset_y, scaler, offset
-
-
-# TODO: refactor
-def load_opsd_de_load_statistics_dataset(reprocess=False):
-    dataset_path = '../de_load_statistics_'
-    scaler_path = '../de_load_statistics_scaler.save'
-
-    if os.path.exists(scaler_path) and not reprocess:
-        print('loading saved dataset')
-
-        dataset_x = np.loadtxt(dataset_path + 'x.csv', delimiter=',')
-        dataset_y = np.loadtxt(dataset_path + 'y.csv', delimiter=',').reshape([-1, 1])
-        offset = np.loadtxt(dataset_path + 'offset.csv', delimiter=',').reshape([-1, 1])
-
-        scaler = joblib.load(scaler_path)
-    else:
-        # process dataset and save
-        dataset = load_opsd_de_load_statistics()
-        dataset_x, dataset_y, scaler, offset = preprocess_load_data_forec(dataset)
-
-        np.savetxt(dataset_path + 'x.csv', dataset_x, delimiter=',')
-        np.savetxt(dataset_path + 'y.csv', dataset_y, delimiter=',')
-        np.savetxt(dataset_path + 'offset.csv', offset, delimiter=',')
-
-        joblib.dump(scaler, scaler_path)
-
-    return dataset_x, dataset_y, scaler, offset
+    return dataset_x, dataset_y, scaler, offset, timestamp
