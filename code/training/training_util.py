@@ -1,5 +1,6 @@
 import time
 
+
 def load_train(model, x_train, y_train, model_name, model_folder, model_prefix, load_saved):
     model_file = model_folder + model_prefix + model_name
 

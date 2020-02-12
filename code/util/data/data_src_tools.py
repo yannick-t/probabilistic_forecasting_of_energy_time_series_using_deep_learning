@@ -12,7 +12,8 @@ def load_opsd_de_load_statistics():
     load_processed_path = '../../opsd_de_load_statistics_60_clean.csv'
     if not os.path.exists(load_processed_path):
         dataset = pandas.read_csv('../../time_series_60min_singleindex.csv', header=0, low_memory=False,
-                                  infer_datetime_format=True, parse_dates=['utc_timestamp'], index_col=['utc_timestamp'])
+                                  infer_datetime_format=True, parse_dates=['utc_timestamp'],
+                                  index_col=['utc_timestamp'])
         dataset.rename(columns={'DE_load_actual_entsoe_power_statistics': 'load'}, inplace=True)
         load_de_statistic = dataset[['load']]
         load_de_statistic = load_de_statistic.dropna()
@@ -27,7 +28,8 @@ def load_opsd_de_load_transparency():
     load_processed_path = '../../opsd_de_load_transparency_15_clean.csv'
     if not os.path.exists(load_processed_path):
         dataset = pandas.read_csv('../../time_series_15min_singleindex.csv', header=0, low_memory=False,
-                                  infer_datetime_format=True, parse_dates=['utc_timestamp'], index_col=['utc_timestamp'])
+                                  infer_datetime_format=True, parse_dates=['utc_timestamp'],
+                                  index_col=['utc_timestamp'])
         dataset.rename(columns={'DE_load_actual_entsoe_transparency': 'load'}, inplace=True)
         load_de_transparency = dataset[['load']]
 
@@ -46,8 +48,9 @@ def load_opsd_de_load_transparency():
     return load_de_transparency
 
 
-def load_opsd_de_load_dataset(type, reprocess=False):
+def load_opsd_de_load_dataset(type, reprocess=False, scaler=None):
     assert type == 'transparency' or type == 'statistics'
+    assert (scaler is not None and reprocess) or (scaler is None)
 
     if type == 'transparency':
         load_fn = load_opsd_de_load_transparency
@@ -70,7 +73,11 @@ def load_opsd_de_load_dataset(type, reprocess=False):
     else:
         # process dataset and save
         dataset = load_fn()
-        dataset_x, dataset_y, scaler, offset, timestamp = preprocess_load_data_forec(dataset)
+        if type == 'statistics':
+            dataset_x, dataset_y, scaler, offset, timestamp = preprocess_load_data_forec(dataset, quarter_hour=False,
+                                                                                         scaler=scaler)
+        else:
+            dataset_x, dataset_y, scaler, offset, timestamp = preprocess_load_data_forec(dataset, scaler=scaler)
 
         np.savetxt(dataset_path + 'x.csv', dataset_x, delimiter=',')
         np.savetxt(dataset_path + 'y.csv', dataset_y, delimiter=',')

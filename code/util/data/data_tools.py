@@ -7,7 +7,7 @@ from sklearn.preprocessing import StandardScaler
 import workalendar.europe.germany as wk
 
 
-def preprocess_load_data_forec(dataframe):
+def preprocess_load_data_forec(dataframe, quarter_hour=True, scaler=None):
     # pre process, extract features for forecasting
 
     # calendars to be used for holiday encoding, complete Germany
@@ -28,13 +28,15 @@ def preprocess_load_data_forec(dataframe):
 
     dataframe = dataframe - offset
     # standard scale
-    scaler = StandardScaler()
-    dataframe['load'] = \
-        scaler.fit_transform(np.array(dataframe['load']).reshape(-1, 1)).squeeze()
+    if scaler is None:
+        scaler = StandardScaler()
+        scaler.fit(np.array(dataframe['load']).reshape(-1, 1))
+    dataframe['load'] = scaler.transform(np.array(dataframe['load']).reshape(-1, 1)).squeeze()
 
     # adjust for lagged variables so there are lagged variables for all targets
-    dataframe_adj = dataframe[dataframe.index[0] + timedelta(days=7): dataframe.index[-1]]
-    offset = offset[offset.index[0] + timedelta(days=7): offset.index[-1]]
+    adj_days = 7
+    dataframe_adj = dataframe[dataframe.index[0] + timedelta(days=adj_days): dataframe.index[-1]]
+    offset = offset[offset.index[0] + timedelta(days=adj_days): offset.index[-1]]
 
     dataset_y = np.zeros([dataframe_adj.size, 1])
     dataset_y[:, 0] = np.array(dataframe_adj['load'])
@@ -92,11 +94,29 @@ def preprocess_load_data_forec(dataframe):
     lagged_days = [-1, -2, -3, -4, -5, -7]
     for d in lagged_days:
         dataset_x_arrays.append(np.array(
-            dataframe[dataframe.index[0] + timedelta(days=7 + d): dataframe.index[-1] + timedelta(days=d)]
+            dataframe[dataframe.index[0] + timedelta(days=adj_days + d): dataframe.index[-1] + timedelta(days=d)]
         ).squeeze())
+    # values for 3h before
+    lagged_hours = [-1, -2, -3]
+    for h in lagged_hours:
+        dataset_x_arrays.append(np.array(
+            dataframe[dataframe.index[0] + timedelta(days=adj_days, hours=h): dataframe.index[-1] + timedelta(hours=h)]
+        ).squeeze())
+        # sanity check to make sure the load to predict is not fed into the model
+        assert not np.array_equal(dataset_x_arrays[-1], dataset_y.squeeze())
+    lagged_quarter_hours = []
+    if quarter_hour:
+        lagged_quarter_hours = [-15, -30, -45]
+        for q in lagged_quarter_hours:
+            dataset_x_arrays.append(np.array(
+                dataframe[
+                dataframe.index[0] + timedelta(days=adj_days, minutes=q): dataframe.index[-1] + timedelta(minutes=q)]
+            ).squeeze())
+            # sanity check to make sure the load to predict is not fed into the model
+            assert not np.array_equal(dataset_x_arrays[-1], dataset_y.squeeze())
 
     dataset_x = np.stack(dataset_x_arrays, axis=-1)
-    assert dataset_x.shape == (dataframe_adj.size, 14 + len(lagged_days) + len(calendars) * 4)
+    assert dataset_x.shape == (dataframe_adj.size, 14 + len(calendars) * 4 + len(lagged_days) + len(lagged_hours) + len(lagged_quarter_hours))
 
     return dataset_x, dataset_y, scaler, np.array(offset), np.array(dataframe_adj.index)
 
