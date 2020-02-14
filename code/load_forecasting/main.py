@@ -38,10 +38,14 @@ model_prefix = 'load_forecasting_'
 
 
 def main():
-    dataset_x, dataset_y, scaler, offset, timestamp = load_opsd_de_load_dataset(type='transparency', reprocess=True)
-    x_train, x_test, y_train, y_test, offset_train, offset_test, timestamp_train, timestamp_test \
-        = train_test_split(dataset_x, dataset_y, offset, timestamp,
-                           test_size=0.2, shuffle=False)
+    dataset = load_opsd_de_load_transparency()
+    train_df, test_df, scaler = preprocess_load_data_forec(dataset, quarter_hour=True)
+
+    y_train, offset_train = train_df.loc[:, 'target'].to_numpy().reshape(-1, 1), train_df.loc[:, 'offset'].to_numpy().reshape(-1, 1)
+    x_train = train_df.drop(columns=['target', 'offset']).to_numpy()
+    y_test, offset_test = test_df.loc[:, 'target'].to_numpy().reshape(-1, 1), test_df.loc[:, 'offset'].to_numpy().reshape(-1, 1)
+    x_test = test_df.drop(columns=['target', 'offset']).to_numpy()
+    timestamp_test = test_df.index.to_numpy()
 
     np.random.seed(333)
     x_ood_rand = np.random.uniform(-3, 3, x_test.shape)
@@ -55,6 +59,7 @@ def main():
     pred = reg.predict(x_test)
     end = time.time_ns()
     pred = scaler.inverse_transform(pred) + offset_test
+    assert pred.shape == (y_test.shape[0], 1)
 
     ax = plt.subplot(1, 1, 1)
     plot_test_data(pred, np.ones_like(pred) * 0.1, y_test_orig, timestamp_test, ax)
@@ -109,7 +114,7 @@ def simple_nn_init(x_train, y_train):
         module__output_size=y_train.shape[-1],
         module__hidden_size=[32, 16],
         lr=0.002,
-        batch_size=1024,
+        batch_size=2048,
         max_epochs=150,
         train_split=None,
         optimizer=torch.optim.Adam,

@@ -1,6 +1,8 @@
 import time
 import numpy as np
 from util.data.data_tools import inverse_transform_normal
+import pandas
+import datetime
 
 
 def predict_transform_multiple(models, names, x_test, scaler):
@@ -31,11 +33,3 @@ def predict_transform(model, x_test, scaler, offset_test, model_name=''):
     pred_y_mean = pred_y_mean + offset_test
 
     return pred_y_mean, pred_y_var, (end - start)
-
-
-def predict_multi_step(model, x_test, x_timestamp, scaler, offset_test, model_name=''):
-    # filter for hour 0 of all start predicion there
-    # x_test_sub = np.array([x for t, x in zip(x_timestamp, x_test) if t.astype('datetime64[h]').astype(int) % 24 == 0])
-    # pred = model.predict(x_test_sub)
-    # TODO: implement
-    pass
