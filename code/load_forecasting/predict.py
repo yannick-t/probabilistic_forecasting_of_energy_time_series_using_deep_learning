@@ -1,8 +1,8 @@
 import time
 import numpy as np
 from util.data.data_tools import inverse_transform_normal
-import pandas
-import datetime
+import pandas as pd
+from datetime import timedelta
 
 
 def predict_transform_multiple(models, names, x_test, scaler):
@@ -33,3 +33,35 @@ def predict_transform(model, x_test, scaler, offset_test, model_name=''):
     pred_y_mean = pred_y_mean + offset_test
 
     return pred_y_mean, pred_y_var, (end - start)
+
+
+def predict_multi_step(model, test_df, lagged_short_term):
+    test_df_x = test_df.drop(columns=['target', 'offset'])
+    # multi step forecast, collect predictions in dataframe
+    pred_multi = pd.DataFrame(np.nan, index=test_df_x.index, columns=['pred'])
+
+    # starting timestamp at which to predict, predict next 24h iteratively  TODO: iterate over starttime and aggregate
+    pred_timestamp_start = pd.date_range(test_df_x.index[0], test_df_x.index[-1] - timedelta(days=1), freq='D')
+
+    for delta in pd.timedelta_range(timedelta(minutes=0), timedelta(days=1), freq='15T', closed='left'):
+        pred_timestamp = pred_timestamp_start + delta  # advance timestamp to predict at
+
+        # select test data at timestamp
+        x_test = test_df_x.loc[pred_timestamp].copy()
+        # use previous predictions for short term lagged variables of input data
+        # as far as possible
+        for minutes in lagged_short_term:
+            lagged = pred_multi.loc[pred_timestamp + timedelta(minutes=minutes), 'pred']
+            if not lagged.isna().any():
+                # value available from previous prediction -> use TODO: sample if distribution
+                x_test.loc[pred_timestamp, 'lagged_short_term_%d' % minutes] = lagged.to_numpy()
+
+        pred = model.predict(x_test.to_numpy())
+        pred_multi.loc[pred_timestamp, 'pred'] = pred.squeeze()
+
+    print(pred_multi.last_valid_index)
+
+    return pred_multi.loc[:, 'pred'].dropna().to_numpy().reshape(-1, 1)
+
+
+

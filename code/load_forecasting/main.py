@@ -9,7 +9,7 @@ from skorch.callbacks import EarlyStopping
 
 from evaluation.evaluate_forecasting_util import plot_test_data, evaluate_multiple
 from evaluation.scoring import rmse, mape, crps, log_likelihood
-from load_forecasting.predict import predict_transform_multiple
+from load_forecasting.predict import predict_transform_multiple, predict_multi_step
 from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
@@ -39,7 +39,7 @@ model_prefix = 'load_forecasting_'
 
 def main():
     dataset = load_opsd_de_load_transparency()
-    train_df, test_df, scaler = preprocess_load_data_forec(dataset, quarter_hour=True)
+    train_df, test_df, scaler = preprocess_load_data_forec(dataset, short_term=True, quarter_hour=True)
 
     y_train, offset_train = train_df.loc[:, 'target'].to_numpy().reshape(-1, 1), train_df.loc[:, 'offset'].to_numpy().reshape(-1, 1)
     x_train = train_df.drop(columns=['target', 'offset']).to_numpy()
@@ -53,12 +53,20 @@ def main():
 
     reg = simple_nn_init(x_train, y_train)
     train_time_simple = load_train(reg, x_train, y_train, 'simple_nn', model_folder=model_folder,
-                                   model_prefix=model_prefix, load_saved=False)
+                                   model_prefix=model_prefix, load_saved=True)
 
     start = time.time_ns()
     pred = reg.predict(x_test)
     end = time.time_ns()
-    pred = scaler.inverse_transform(pred) + offset_test
+    assert pred.shape == (y_test.shape[0], 1)
+
+    # TODO: refactor
+    pred_multi = predict_multi_step(reg, test_df, lagged_short_term=[-60, -120, -180, -15, -30, -45])
+    y_test = y_test[:pred_multi.shape[0]]
+    pred = pred_multi
+    pred = scaler.inverse_transform(pred) + offset_test[:pred_multi.shape[0]]
+    y_test_orig = y_test_orig[:pred_multi.shape[0]]
+    timestamp_test = timestamp_test[:pred_multi.shape[0]]
     assert pred.shape == (y_test.shape[0], 1)
 
     ax = plt.subplot(1, 1, 1)
@@ -115,7 +123,7 @@ def simple_nn_init(x_train, y_train):
         module__hidden_size=[32, 16],
         lr=0.002,
         batch_size=2048,
-        max_epochs=150,
+        max_epochs=100,
         train_split=None,
         optimizer=torch.optim.Adam,
         criterion=torch.nn.MSELoss,

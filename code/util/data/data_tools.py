@@ -10,7 +10,7 @@ from statsmodels.tsa.api import ExponentialSmoothing, STL, seasonal_decompose
 import matplotlib.pyplot as plt
 
 
-def preprocess_load_data_forec(dataframe, quarter_hour=True, scaler=None):
+def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, scaler=None):
     # use GW for convenience and readability later, also the standard-scaled values are smaller
     dataframe = dataframe / 1000
 
@@ -48,13 +48,13 @@ def preprocess_load_data_forec(dataframe, quarter_hour=True, scaler=None):
         offset_test['load'] = offset_test['load'] + test_pred
 
     # construct features
-    train_df = construct_features(train_df, offset_train, quarter_hour)
-    test_df = construct_features(test_df, offset_test, quarter_hour)
+    train_df = construct_features(dataframe=train_df, offset=offset_train, short_term=short_term, quarter_hour=quarter_hour)
+    test_df = construct_features(dataframe=test_df, offset=offset_test, short_term=short_term, quarter_hour=quarter_hour)
 
     return train_df, test_df, scaler
 
 
-def construct_features(dataframe, offset, quarter_hour=True):
+def construct_features(dataframe, offset, short_term=True, quarter_hour=True):
     # pre process, define features for forecasting
 
     # calendars to be used for holiday encoding, complete Germany
@@ -138,30 +138,24 @@ def construct_features(dataframe, offset, quarter_hour=True):
         assert not (result['target'] == result['lagged_day_%d' % d]).sum() > 50
 
     # values for 3h before
-    lagged_hours = [-1, -2, -3]
-    for h in lagged_hours:
-        result = result.assign(**{'lagged_hours_%d' % h: np.array(
-            dataframe[dataframe.index[0] + timedelta(days=adj_days, hours=h): dataframe.index[-1] + timedelta(hours=h)]
+    if short_term:
+        lagged_short_term = [-60, -120, -180]
+        if quarter_hour:
+            lagged_short_term.extend([-15, -30, -45])
+    else:
+        lagged_short_term = []
+    for minutes in lagged_short_term:
+        result = result.assign(**{'lagged_short_term_%d' % minutes: np.array(
+            dataframe[dataframe.index[0] + timedelta(days=adj_days, minutes=minutes): dataframe.index[-1] + timedelta(minutes=minutes)]
         ).squeeze()})
         # sanity check to make sure the load to predict is not fed into the model
         # (some of the values are the same in the datasets used, probably because of filled
         # missing values, so allow some leeway)
-        assert not (result['target'] == result['lagged_hours_%d' % h]).sum() > 50
-
-    lagged_quarter_hours = []
-    if quarter_hour:
-        lagged_quarter_hours = [-15, -30, -45]
-        for q in lagged_quarter_hours:
-            result = result.assign(**{'lagged_quarter_hours_%d' % q: np.array(
-                dataframe[
-                dataframe.index[0] + timedelta(days=adj_days, minutes=q): dataframe.index[-1] + timedelta(minutes=q)]
-            ).squeeze()})
-            # sanity check to make sure the load to predict is not fed into the model
-            assert not (result['target'] == result['lagged_hours_%d' % h]).sum() > 50
+        assert not (result['target'] == result['lagged_short_term_%d' % minutes]).sum() > 50
 
     assert result.shape == (
         dataframe_adj.shape[0],
-        16 + len(calendars) * 4 + len(lagged_days) + len(lagged_hours) + len(lagged_quarter_hours))
+        16 + len(calendars) * 4 + len(lagged_days) + len(lagged_short_term))
 
     return result
 

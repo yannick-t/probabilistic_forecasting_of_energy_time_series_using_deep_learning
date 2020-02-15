@@ -15,6 +15,7 @@ dependencies:
   - scikit-optimize=0.5.2
   - skorch=0.7.0
   - torchvision=0.5.0
+  - statsmodels=0.11.0
   - pip:
     - gpytorch==1.0.1
     - workalendar==8.0.2
