@@ -36,30 +36,41 @@ def predict_transform(model, x_test, scaler, offset_test, model_name=''):
 
 
 def predict_multi_step(model, test_df, lagged_short_term):
+    # TODO: variable horizon
+    # multi step forecast by feeding the predictions back into the model
+    # for the short term lagged variables
     test_df_x = test_df.drop(columns=['target', 'offset'])
-    # multi step forecast, collect predictions in dataframe
-    pred_multi = pd.DataFrame(np.nan, index=test_df_x.index, columns=['pred'])
 
-    # starting timestamp at which to predict, predict next 24h iteratively  TODO: iterate over starttime and aggregate
-    pred_timestamp_start = pd.date_range(test_df_x.index[0], test_df_x.index[-1] - timedelta(days=1), freq='D')
+    start_delta_range = pd.timedelta_range(timedelta(minutes=0), timedelta(days=1), freq='15T', closed='left')
+    # collect predictions in dataframe
+    pred_multi = pd.DataFrame(np.nan, index=test_df_x.index,
+                              columns=['pred%d' % sd.minutes for sd in start_delta_range])
 
-    for delta in pd.timedelta_range(timedelta(minutes=0), timedelta(days=1), freq='15T', closed='left'):
-        pred_timestamp = pred_timestamp_start + delta  # advance timestamp to predict at
+    # itterate over start time and predict until horizon for each possible start time
+    for start_delta in start_delta_range:
+        # starting timestamp at which to predict, predict next 24h iteratively
+        pred_timestamp_start = pd.date_range(test_df_x.index[0] + start_delta, test_df_x.index[-1]
+                                             - timedelta(days=1), freq='D')
+        pred_column = 'pred%d' % start_delta.minutes
 
-        # select test data at timestamp
-        x_test = test_df_x.loc[pred_timestamp].copy()
-        # use previous predictions for short term lagged variables of input data
-        # as far as possible
-        for minutes in lagged_short_term:
-            lagged = pred_multi.loc[pred_timestamp + timedelta(minutes=minutes), 'pred']
-            if not lagged.isna().any():
-                # value available from previous prediction -> use TODO: sample if distribution
-                x_test.loc[pred_timestamp, 'lagged_short_term_%d' % minutes] = lagged.to_numpy()
+        for delta in pd.timedelta_range(timedelta(minutes=0), timedelta(days=1), freq='15T', closed='left'):
+            pred_timestamp = pred_timestamp_start + delta  # advance timestamp to predict at
 
-        pred = model.predict(x_test.to_numpy())
-        pred_multi.loc[pred_timestamp, 'pred'] = pred.squeeze()
+            # select test data at timestamp
+            x_test = test_df_x.loc[pred_timestamp].copy()
+            # use previous predictions for short term lagged variables of input data
+            # as far as possible
+            for minutes in lagged_short_term:
+                lagged = pred_multi.loc[pred_timestamp + timedelta(minutes=minutes), pred_column]
+                if not lagged.isna().any():
+                    # value available from previous prediction -> use TODO: sample if distribution
+                    x_test.loc[pred_timestamp, 'lagged_short_term_%d' % minutes] = lagged.to_numpy()
 
-    print(pred_multi.last_valid_index)
+            pred = model.predict(x_test.to_numpy())
+            pred_multi.loc[pred_timestamp, pred_column] = pred.squeeze()
+            print(pred_multi)
+
+        print(pred_multi)
 
     return pred_multi.loc[:, 'pred'].dropna().to_numpy().reshape(-1, 1)
 
