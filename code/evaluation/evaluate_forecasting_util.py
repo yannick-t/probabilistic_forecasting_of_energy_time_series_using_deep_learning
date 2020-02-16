@@ -74,6 +74,29 @@ def evaluate_single(pred_mean, pred_var, true_y):
     plt.show()
 
 
+def evaluate_multi_step(pred_df, y_test, offset_test, scaler):
+    rmses = np.empty(shape=(len(pred_df.columns)))
+    mapes = np.empty(shape=(len(pred_df.columns)))
+    for idx, column in enumerate(pred_df.columns):
+        first_valid = pred_df.loc[:, column].first_valid_index()
+        last_valid = pred_df.loc[:, column].last_valid_index()
+        first_valid_idx = pred_df.index.get_loc(first_valid)
+        last_valid_idx = pred_df.index.get_loc(last_valid) + 1
+
+        pred = pred_df.loc[first_valid: last_valid, column].to_numpy().reshape(-1, 1)
+        pred = scaler.inverse_transform(pred) + offset_test[first_valid_idx: last_valid_idx]
+        y_test_adj = y_test[first_valid_idx: last_valid_idx]
+        rmses[idx] = rmse(pred, y_test_adj)
+        mapes[idx] = mape(pred, y_test_adj)
+
+    print('############################')
+    print('Multi-Step:')
+    print("RMSE: %.4f" % rmses.mean())
+    print("MAPE: %.2f" % mapes.mean())
+
+
+
+
 def plot_test_data(pred_mean, pred_var, y_true, timestamp, ax):
     x = timestamp
 

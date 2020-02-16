@@ -35,25 +35,25 @@ def predict_transform(model, x_test, scaler, offset_test, model_name=''):
     return pred_y_mean, pred_y_var, (end - start)
 
 
-def predict_multi_step(model, test_df, lagged_short_term):
-    # TODO: variable horizon
+def predict_multi_step(model, test_df, lagged_short_term, horizon=1440):
+    assert horizon % 15 == 0
     # multi step forecast by feeding the predictions back into the model
     # for the short term lagged variables
     test_df_x = test_df.drop(columns=['target', 'offset'])
 
-    start_delta_range = pd.timedelta_range(timedelta(minutes=0), timedelta(days=1), freq='15T', closed='left')
+    start_delta_range = pd.timedelta_range(timedelta(minutes=0), timedelta(minutes=horizon), freq='15T', closed='left')
     # collect predictions in dataframe
     pred_multi = pd.DataFrame(np.nan, index=test_df_x.index,
-                              columns=['pred%d' % sd.minutes for sd in start_delta_range])
+                              columns=['pred%d' % sd.seconds for sd in start_delta_range])
 
     # itterate over start time and predict until horizon for each possible start time
     for start_delta in start_delta_range:
         # starting timestamp at which to predict, predict next 24h iteratively
         pred_timestamp_start = pd.date_range(test_df_x.index[0] + start_delta, test_df_x.index[-1]
-                                             - timedelta(days=1), freq='D')
-        pred_column = 'pred%d' % start_delta.minutes
+                                             - timedelta(days=1), freq=pd.DateOffset(minutes=horizon))
+        pred_column = 'pred%d' % start_delta.seconds
 
-        for delta in pd.timedelta_range(timedelta(minutes=0), timedelta(days=1), freq='15T', closed='left'):
+        for delta in pd.timedelta_range(timedelta(minutes=0), timedelta(minutes=horizon), freq='15T', closed='left'):
             pred_timestamp = pred_timestamp_start + delta  # advance timestamp to predict at
 
             # select test data at timestamp
@@ -68,11 +68,8 @@ def predict_multi_step(model, test_df, lagged_short_term):
 
             pred = model.predict(x_test.to_numpy())
             pred_multi.loc[pred_timestamp, pred_column] = pred.squeeze()
-            print(pred_multi)
 
-        print(pred_multi)
-
-    return pred_multi.loc[:, 'pred'].dropna().to_numpy().reshape(-1, 1)
+    return pred_multi
 
 
 

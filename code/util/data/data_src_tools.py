@@ -48,7 +48,7 @@ def load_opsd_de_load_transparency():
     return load_de_transparency
 
 
-def load_opsd_de_load_dataset(type, reprocess=False, scaler=None):
+def load_opsd_de_load_dataset(type, short_term=True, reprocess=False, scaler=None):
     assert type == 'transparency' or type == 'statistics'
     assert (scaler is not None and reprocess) or (scaler is None)
 
@@ -61,29 +61,29 @@ def load_opsd_de_load_dataset(type, reprocess=False, scaler=None):
         dataset_path = '../de_load_statistics_'
         scaler_path = '../de_load_statistics_scaler.save'
 
-    if os.path.exists(scaler_path) and not reprocess:
+    if short_term:
+        dataset_path = dataset_path + 'short_term_'
+
+    if os.path.exists(dataset_path + 'train.csv') and not reprocess:
         print('loading saved dataset')
 
-        dataset_x = np.loadtxt(dataset_path + 'x.csv', delimiter=',')
-        dataset_y = np.loadtxt(dataset_path + 'y.csv', delimiter=',').reshape([-1, 1])
-        offset = np.loadtxt(dataset_path + 'offset.csv', delimiter=',').reshape([-1, 1])
-        timestamp = np.loadtxt(dataset_path + 'timestamp.csv', delimiter=',', dtype='datetime64[ns]')
+        train_df = pandas.read_csv(dataset_path + 'train.csv', infer_datetime_format=True,
+                                   parse_dates=['utc_timestamp'], index_col=['utc_timestamp'])
+        test_df = pandas.read_csv(dataset_path + 'test.csv', infer_datetime_format=True,
+                                   parse_dates=['utc_timestamp'], index_col=['utc_timestamp'])
 
         scaler = joblib.load(scaler_path)
     else:
         # process dataset and save
         dataset = load_fn()
         if type == 'statistics':
-            dataset_x, dataset_y, scaler, offset, timestamp = preprocess_load_data_forec(dataset, quarter_hour=False,
-                                                                                         scaler=scaler)
+            train_df, test_df, scaler = preprocess_load_data_forec(dataset, short_term=short_term, quarter_hour=False, scaler=scaler)
         else:
-            dataset_x, dataset_y, scaler, offset, timestamp = preprocess_load_data_forec(dataset, scaler=scaler)
+            train_df, test_df, scaler = preprocess_load_data_forec(dataset, short_term=short_term, quarter_hour=True, scaler=scaler)
 
-        np.savetxt(dataset_path + 'x.csv', dataset_x, delimiter=',')
-        np.savetxt(dataset_path + 'y.csv', dataset_y, delimiter=',')
-        np.savetxt(dataset_path + 'offset.csv', offset, delimiter=',')
-        np.savetxt(dataset_path + 'timestamp.csv', timestamp, delimiter=',', fmt='%s')
+        train_df.to_csv(dataset_path + 'train.csv')
+        test_df.to_csv(dataset_path + 'test.csv')
 
         joblib.dump(scaler, scaler_path)
 
-    return dataset_x, dataset_y, scaler, offset, timestamp
+    return train_df, test_df, scaler
