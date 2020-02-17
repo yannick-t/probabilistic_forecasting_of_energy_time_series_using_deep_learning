@@ -82,6 +82,11 @@ def construct_features(dataframe, offset, short_term=True, quarter_hour=True):
     result = result.assign(sin_dayhour=(np.sin(((day_hour / 24) * 2 * np.pi) - np.pi / 2) + 1) * 2)
     result = result.assign(cos_dayhour=(np.cos(((day_hour / 24) * 2 * np.pi) - np.pi / 2) + 1) * 2)
 
+    # day encoding normal
+    result = result.assign(dayhour=day_hour)
+    # time of year encoding normal
+    # result = result.assign(yeartime=(year_day / 365) * 12)
+
     # day encoding weekend
     result = result.assign(weekday_oh=np.array([1 if time.isoweekday() <= 5 else 0 for time in dataframe_adj.index]))
     # day encoding day of week one hot
@@ -155,7 +160,7 @@ def construct_features(dataframe, offset, short_term=True, quarter_hour=True):
 
     assert result.shape == (
         dataframe_adj.shape[0],
-        16 + len(calendars) * 4 + len(lagged_days) + len(lagged_short_term))
+        17 + len(calendars) * 4 + len(lagged_days) + len(lagged_short_term))
 
     return result
 

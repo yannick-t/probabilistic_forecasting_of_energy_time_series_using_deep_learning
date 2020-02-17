@@ -7,9 +7,9 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from skorch.callbacks import EarlyStopping
 
-from evaluation.evaluate_forecasting_util import plot_test_data, evaluate_multiple, evaluate_multi_step
+from evaluation.evaluate_forecasting_util import plot_test_data, evaluate_multiple, evaluate_multi_step, evaluate_single
 from evaluation.scoring import rmse, mape, crps, log_likelihood
-from load_forecasting.predict import predict_transform_multiple, predict_multi_step
+from load_forecasting.predict import predict_transform_multiple, predict_multi_step, predict_transform
 from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
@@ -38,7 +38,6 @@ model_prefix = 'load_forecasting_'
 
 
 def main():
-    dataset = load_opsd_de_load_transparency()
     train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=True, reprocess=False)
 
     y_train, offset_train = train_df.loc[:, 'target'].to_numpy().reshape(-1, 1), train_df.loc[:, 'offset'].to_numpy().reshape(-1, 1)
@@ -51,32 +50,39 @@ def main():
     x_ood_rand = np.random.uniform(-3, 3, x_test.shape)
     y_test_orig = scaler.inverse_transform(y_test) + offset_test
 
-    reg = simple_nn_init(x_train, y_train)
-    train_time_simple = load_train(reg, x_train, y_train, 'simple_nn', model_folder=model_folder,
-                                   model_prefix=model_prefix, load_saved=True)
+    # reg = simple_nn_init(x_train, y_train)
+    # train_time_simple = load_train(reg, x_train, y_train, 'simple_nn', model_folder=model_folder,
+    #                                model_prefix=model_prefix, load_saved=False)
+    #
+    # start = time.time_ns()
+    # pred = reg.predict(x_test)
+    # pred = scaler.inverse_transform(pred) + offset_test
+    # end = time.time_ns()
+    # assert pred.shape == (y_test.shape[0], 1)
+    #
+    # print('###############################')
+    # print('Simple NN:')
+    # print("RMSE: %.4f" % rmse(pred, y_test_orig))
+    # print("MAPE: %.2f" % mape(pred, y_test_orig))
 
-    start = time.time_ns()
-    pred = reg.predict(x_test)
-    pred = scaler.inverse_transform(pred) + offset_test
-    end = time.time_ns()
-    assert pred.shape == (y_test.shape[0], 1)
+    concrete = concrete_init(x_train, y_train)
+    train_time_conc = load_train(concrete, x_train, y_train, 'concrete', model_folder, model_prefix, load_saved=False)
+    pred_y_mean, pred_y_var, _ = predict_transform(concrete, x_test, scaler, offset_test, 'concrete')
 
-    horizon = 1440  # horizon in minutes
-    pred_multi = predict_multi_step(reg, test_df, lagged_short_term=[-60, -120, -180, -15, -30, -45], horizon=horizon)
-    assert pred_multi.shape == (y_test.shape[0], horizon // 15)
-    evaluate_multi_step(pred_multi, y_test_orig, offset_test, scaler)
+    evaluate_single(pred_y_mean, pred_y_var, y_test)
 
-    ax = plt.subplot(1, 1, 1)
-    plot_test_data(pred, np.ones_like(pred) * 0.1, y_test_orig, timestamp_test, ax)
+    # horizon = 1440  # horizon in minutes
+    # pred_multi = predict_multi_step(reg, test_df, lagged_short_term=[-60, -120, -180, -15, -30, -45], horizon=horizon)
+    # assert pred_multi.shape == (y_test.shape[0], horizon // 15)
+    # evaluate_multi_step(pred_multi, y_test_orig, offset_test, scaler)
+
+    # ax = plt.subplot(1, 1, 1)
+    # plot_test_data(pred, np.ones_like(pred) * 0.1, y_test_orig, timestamp_test, ax)
     # ax = plt.subplot(1, 2, 2)
     # pred_simple_train = reg.predict(x_train)
     # plot_test_data(pred_simple_train, np.ones_like(pred_simple_train) * 0.01, y_train, timestamp_train, ax)
-    plt.show()
+    # plt.show()
 
-    print('###############################')
-    print('Simple NN:')
-    print("RMSE: %.4f" % rmse(pred, y_test_orig))
-    print("MAPE: %.2f" % mape(pred, y_test_orig))
 
 
 def init_train_eval_all(x_train, y_train, x_test, y_test, y_test_orig, x_ood_rand, scaler):
@@ -117,10 +123,10 @@ def simple_nn_init(x_train, y_train):
         module=SimpleNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1],
-        module__hidden_size=[32, 16],
-        lr=0.002,
-        batch_size=2048,
-        max_epochs=100,
+        module__hidden_size=[16, 128, 128, 128],
+        lr=0.0015,
+        batch_size=1024,
+        max_epochs=200,
         train_split=None,
         optimizer=torch.optim.Adam,
         criterion=torch.nn.MSELoss,
@@ -217,14 +223,14 @@ def concrete_init(x_train, y_train):
         module=ConcreteDropoutNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
-        module__hidden_size=[64, 64, 7],
+        module__hidden_size=[16, 128, 128, 128],
         lengthscale=1e-4,
         dataset_size=x_train.shape[0],
         sample_count=30,
-        lr=0.001,
+        lr=0.0015,
         train_split=None,
         verbose=1,
-        max_epochs=3000,
+        max_epochs=200,
         batch_size=1024,
         optimizer=torch.optim.Adam,
         criterion=HeteroscedasticLoss,

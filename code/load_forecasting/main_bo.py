@@ -15,7 +15,7 @@ from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from models.torch_bnn import TorchBNN
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
-from util.data.data_src_tools import load_opsd_de_load_transparency
+from util.data.data_src_tools import load_opsd_de_load_transparency, load_opsd_de_load_dataset
 from hyperparameter_opt.bayesian_optimization import bayesian_optimization, mse_scorer, crps_scorer
 from util.data.data_tools import preprocess_load_data_forec
 
@@ -28,8 +28,7 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    dataset = load_opsd_de_load_transparency()
-    train_df, test_df, scaler = preprocess_load_data_forec(dataset, quarter_hour=True)
+    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=True, reprocess=False)
 
     y_train, offset_train = train_df.loc[:, 'target'].to_numpy().reshape(-1, 1), train_df.loc[:, 'offset'].to_numpy()\
         .reshape(-1, 1)
@@ -162,7 +161,7 @@ def concrete_bo(x_train, y_train, x_test, y_test):
                               sample_count=30,
                               lr=0.001,
                               train_split=None,
-                              max_epochs=2000,
+                              max_epochs=200,
                               batch_size=1024,
                               optimizer=torch.optim.Adam,
                               criterion=HeteroscedasticLoss,
@@ -170,16 +169,15 @@ def concrete_bo(x_train, y_train, x_test, y_test):
                               verbose=0)
 
     space = {
-        'lr': Real(0.001, 0.04, 'log-uniform'),
-        'lengthscale': Real(1e-6, 0.1, 'log-uniform'),
+        # 'lr': Real(0.001, 0.04, 'log-uniform'),
+        # 'lengthscale': Real(1e-8, 0.1, 'log-uniform'),
         # 'max_epochs': Integer(50, 1000),
-        # 'batch_size': Integer(1000, 4000),
-        'module__hidden_size_0': Integer(64, 512),
-        'module__hidden_size_1': Integer(64, 512),
-        'module__hidden_size_2': Integer(12, 512),
-        'module__hidden_size_3': Integer(1, 256),
+        'module__hidden_size_0': Integer(1, 128),
+        'module__hidden_size_1': Integer(1, 128),
+        'module__hidden_size_2': Integer(1, 256),
+        'module__hidden_size_3': Integer(1, 128),
     }
-    bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=333, cv=cv)
+    bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=200, cv=cv)
 
 
 def simple_nn_bo(x_train, y_train, x_test, y_test):
@@ -190,20 +188,23 @@ def simple_nn_bo(x_train, y_train, x_test, y_test):
                              optimizer=torch.optim.Adam,
                              criterion=torch.nn.MSELoss,
                              device=device,
-                             batch_size=2048,
+                             lr=0.0015,
+                             max_epochs=200,
+                             batch_size=1024,
                              train_split=None,
                              verbose=0)
 
-    space = {'lr': Real(0.01, 0.1, 'log-uniform'),
-             'max_epochs': Integer(25, 500),
-             'module__hidden_size_0': Integer(16, 512),
-             'module__hidden_size_1': Integer(16, 512),
-             'module__hidden_size_2': Integer(1, 512),
-             'module__hidden_size_3': Integer(1, 256),
-             'module__dropout_prob': Real(0, 0.5)
-             }
+    space = {
+        # 'lr': Real(0.01, 0.1, 'log-uniform'),
+        # 'max_epochs': Integer(25, 500),
+        'module__hidden_size_0': Integer(1, 128),
+        'module__hidden_size_1': Integer(1, 128),
+        'module__hidden_size_2': Integer(1, 256),
+        'module__hidden_size_3': Integer(1, 128),
+        # 'module__dropout_prob': Real(0, 0.5)
+    }
 
-    bayesian_optimization(simple_nn, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=300)
+    bayesian_optimization(simple_nn, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=200)
 
 
 main()
