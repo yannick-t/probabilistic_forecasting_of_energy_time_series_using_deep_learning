@@ -1,8 +1,9 @@
 import time
 import numpy as np
-from util.data.data_tools import inverse_transform_normal
 import pandas as pd
 from datetime import timedelta
+
+from util.data.data_tools import inverse_transform_normal
 
 
 def predict_transform_multiple(models, names, x_test, scaler):

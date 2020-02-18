@@ -3,6 +3,7 @@ from sklearn.model_selection import train_test_split
 from skopt.space import Real, Integer
 from skorch.callbacks import EarlyStopping
 
+from load_forecasting.forecast_util import dataset_df_to_np
 from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
@@ -29,14 +30,10 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 # and hyperparameter optimization
 def main():
     short_term = False
-    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False)
+    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=True, reprocess=False)
 
-    y_train, offset_train = train_df.loc[:, 'target'].to_numpy().reshape(-1, 1), train_df.loc[:, 'offset'].to_numpy()\
-        .reshape(-1, 1)
-    x_train = train_df.drop(columns=['target', 'offset']).to_numpy()
-    y_test, offset_test = test_df.loc[:, 'target'].to_numpy().reshape(-1, 1), test_df.loc[:, 'offset'].to_numpy()\
-        .reshape(-1, 1)
-    x_test = test_df.drop(columns=['target', 'offset']).to_numpy()
+    x_train, y_train, offset_train = dataset_df_to_np(train_df)
+    x_test, y_test, offset_test = dataset_df_to_np(test_df)
 
     print('Bayesian Optimization')
     print('OPSD ENTSOE-E Transparency')
@@ -112,14 +109,15 @@ def deep_ens_bo(x_train, y_train, x_test, y_test):
         device=device
     )
 
-    space = {'lr': Real(0.01, 0.1, 'log-uniform'),
-             'hidden_size_0': Integer(16, 1024),
-             'hidden_size_1': Integer(16, 1024),
-             'hidden_size_2': Integer(1, 1024),
-             'hidden_size_3': Integer(1, 1024),
-             # 'hidden_size_4': Integer(1, 1024),
-             # 'hidden_size_5': Integer(1, 1024),
-             }
+    space = {
+        # 'lr': Real(0.01, 0.1, 'log-uniform'),
+        'hidden_size_0': Integer(16, 1024),
+        'hidden_size_1': Integer(16, 1024),
+        'hidden_size_2': Integer(1, 1024),
+        'hidden_size_3': Integer(1, 1024),
+        # 'hidden_size_4': Integer(1, 1024),
+        # 'hidden_size_5': Integer(1, 1024),
+    }
 
     bayesian_optimization(deep_ens, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=512)
 
@@ -147,10 +145,8 @@ def fnp_bo(x_train, y_train, x_test, y_test):
         'reference_set_size_ratio': Real(0.01, 0.4),
         'module__hidden_size_enc_0': Integer(64, 256),
         'module__hidden_size_enc_1': Integer(64, 512),
-        'module__hidden_size_enc_2': Integer(1, 256),
         'module__hidden_size_dec_0': Integer(16, 256),
         'module__hidden_size_dec_1': Integer(16, 512),
-        'module__hidden_size_dec_2': Integer(1, 256),
     }
 
     bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=1024, cv=cv)

@@ -46,7 +46,18 @@ class DeepGPSkorch(BaseNNSkorch):
     def predict(self, X):
         self.module_.eval()
 
-        predictive_means, predictive_variances = self.module_.predict(to_tensor(X, self.device))
+        # batched predictions, because ram!
+        pred_means = []
+        pred_vars = []
+        for idx in np.arange(0, X.shape[0], self.batch_size):
+            predictive_means, predictive_variances = \
+                self.module_.predict(to_tensor(X[idx: min(idx + self.batch_size, X.shape[0])], self.device))
+
+            pred_means.append(predictive_means)
+            pred_vars.append(predictive_variances)
+
+        predictive_means = torch.cat(pred_means, dim=1)
+        predictive_variances = torch.cat(pred_vars, dim=1)
 
         outut_dim = int(self.module__output_size / 2)
 

@@ -26,9 +26,10 @@ class DeepGPHeteroscedasticLoss(nn.Module):
         dist = Normal(mean, std)
         loss = (dist.log_prob(target)).mean(0)
         loss = loss.mean(0)
+        loss = loss.mean(-1)
         covar_shape = preds.covariance_matrix.shape
 
-        pred_aleo_mean = MultivariateNormal(preds.mean[..., :outut_dim].squeeze(-1),
+        pred_aleo_mean = MultivariateNormal(preds.mean[..., :outut_dim].reshape([-1, int(covar_shape[-1] / 2)]),
                                             preds.covariance_matrix[..., :int(covar_shape[-2] / 2), :int(covar_shape[-1] / 2)])
 
-        return self.mll(pred_aleo_mean, target.squeeze()) + loss
+        return self.mll(pred_aleo_mean, target.reshape([-1, pred_aleo_mean.loc.shape[-1]])) + loss

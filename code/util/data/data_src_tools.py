@@ -48,18 +48,23 @@ def load_opsd_de_load_transparency():
     return load_de_transparency
 
 
-def load_opsd_de_load_dataset(type, short_term=True, reprocess=False, scaler=None):
+def load_opsd_de_load_dataset(type, short_term=True, reprocess=False, scaler=None, n_ahead=1):
     assert type == 'transparency' or type == 'statistics'
     assert (scaler is not None and reprocess) or (scaler is None)
 
+    if not os.path.exists('../tmp/'):
+        os.mkdir('../tmp/')
+
     if type == 'transparency':
         load_fn = load_opsd_de_load_transparency
-        dataset_path = '../de_load_transparency_'
-        scaler_path = '../de_load_transparency_scaler.save'
+        dataset_path = '../tmp/de_load_transparency_'
+        scaler_path = '../tmp/de_load_transparency_scaler.save'
     elif type == 'statistics':
         load_fn = load_opsd_de_load_statistics
-        dataset_path = '../de_load_statistics_'
-        scaler_path = '../de_load_statistics_scaler.save'
+        dataset_path = '../tmp/de_load_statistics_'
+        scaler_path = '../tmp/de_load_statistics_scaler.save'
+
+    dataset_path = dataset_path + 'n_ahead%d_' % n_ahead
 
     if short_term:
         dataset_path = dataset_path + 'short_term_'
@@ -77,9 +82,9 @@ def load_opsd_de_load_dataset(type, short_term=True, reprocess=False, scaler=Non
         # process dataset and save
         dataset = load_fn()
         if type == 'statistics':
-            train_df, test_df, scaler = preprocess_load_data_forec(dataset, short_term=short_term, quarter_hour=False, scaler=scaler)
+            train_df, test_df, scaler = preprocess_load_data_forec(dataset, short_term=short_term, quarter_hour=False, scaler=scaler, n_ahead=n_ahead)
         else:
-            train_df, test_df, scaler = preprocess_load_data_forec(dataset, short_term=short_term, quarter_hour=True, scaler=scaler)
+            train_df, test_df, scaler = preprocess_load_data_forec(dataset, short_term=short_term, quarter_hour=True, scaler=scaler, n_ahead=n_ahead)
 
         train_df.to_csv(dataset_path + 'train.csv')
         test_df.to_csv(dataset_path + 'test.csv')

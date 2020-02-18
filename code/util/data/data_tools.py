@@ -10,7 +10,7 @@ from statsmodels.tsa.api import ExponentialSmoothing, STL, seasonal_decompose
 import matplotlib.pyplot as plt
 
 
-def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, scaler=None):
+def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, scaler=None, n_ahead=1):
     # use GW for convenience and readability later, also the standard-scaled values are smaller
     dataframe = dataframe / 1000
 
@@ -48,13 +48,13 @@ def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, sc
         offset_test['load'] = offset_test['load'] + test_pred
 
     # construct features
-    train_df = construct_features(dataframe=train_df, offset=offset_train, short_term=short_term, quarter_hour=quarter_hour)
-    test_df = construct_features(dataframe=test_df, offset=offset_test, short_term=short_term, quarter_hour=quarter_hour)
+    train_df = construct_features(dataframe=train_df, offset=offset_train, short_term=short_term, quarter_hour=quarter_hour, n_ahead=n_ahead)
+    test_df = construct_features(dataframe=test_df, offset=offset_test, short_term=short_term, quarter_hour=quarter_hour, n_ahead=n_ahead)
 
     return train_df, test_df, scaler
 
 
-def construct_features(dataframe, offset, short_term=True, quarter_hour=True):
+def construct_features(dataframe, offset, short_term=True, quarter_hour=True, n_ahead=1):
     # pre process, define features for forecasting
 
     # calendars to be used for holiday encoding, complete Germany
@@ -64,12 +64,17 @@ def construct_features(dataframe, offset, short_term=True, quarter_hour=True):
 
     # adjust for lagged variables so there are lagged variables for all targets
     adj_days = 7
-    dataframe_adj = dataframe[dataframe.index[0] + timedelta(days=adj_days): dataframe.index[-1]]
-    offset = offset[offset.index[0] + timedelta(days=adj_days): offset.index[-1]]
+    dataframe_adj = dataframe[dataframe.index[0] + timedelta(days=adj_days): dataframe.index[-n_ahead]]
+    offset_adj = offset[offset.index[0] + timedelta(days=adj_days): offset.index[-n_ahead]]
 
     result = pd.DataFrame(index=dataframe_adj.index)
-    result = result.assign(target=dataframe_adj['load'])
-    result = result.assign(offset=offset['load'])
+    for t in range(n_ahead):
+        result = result.assign(**{'target_%d' % t:
+                                      dataframe[dataframe.index[t] + timedelta(days=adj_days): dataframe.index[t - n_ahead]]['load'].to_numpy()})
+        result = result.assign(**{'offset_%d' % t:
+                                      offset[offset.index[t] + timedelta(days=adj_days): offset.index[t - n_ahead]]['load'].to_numpy()})
+
+    dataframe = dataframe[dataframe.index[0]: dataframe.index[-n_ahead]]
 
     # time of year, value between 0 and 1, high in summer, low in winter
     year_day = np.array([time.timetuple().tm_yday - 1 for time in dataframe_adj.index])
@@ -140,7 +145,7 @@ def construct_features(dataframe, offset, short_term=True, quarter_hour=True):
         result = result.assign(**{'lagged_day_%d' % d: np.array(
                                           dataframe[dataframe.index[0] + timedelta(days=adj_days + d): dataframe.index[-1] + timedelta(days=d)]
                                       ).squeeze()})
-        assert not (result['target'] == result['lagged_day_%d' % d]).sum() > 50
+        assert not (result['target_0'] == result['lagged_day_%d' % d]).sum() > 50
 
     # values for 3h before
     if short_term:
@@ -156,11 +161,11 @@ def construct_features(dataframe, offset, short_term=True, quarter_hour=True):
         # sanity check to make sure the load to predict is not fed into the model
         # (some of the values are the same in the datasets used, probably because of filled
         # missing values, so allow some leeway)
-        assert not (result['target'] == result['lagged_short_term_%d' % minutes]).sum() > 50
+        assert not (result['target_0'] == result['lagged_short_term_%d' % minutes]).sum() > 50
 
     assert result.shape == (
-        dataframe_adj.shape[0],
-        17 + len(calendars) * 4 + len(lagged_days) + len(lagged_short_term))
+        dataframe_adj.shape[0], n_ahead * 2 +
+        15 + len(calendars) * 4 + len(lagged_days) + len(lagged_short_term))
 
     return result
 
