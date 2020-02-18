@@ -8,6 +8,7 @@ from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
+from models.skorch_wrappers.aleotoric_nn_skorch import AleatoricNNSkorch
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from models.simple_nn import SimpleNN
 from models.skorch_wrappers.bnn_skorch import BNNSkorch
@@ -39,10 +40,11 @@ def main():
     print('OPSD ENTSOE-E Transparency')
     print('short term: %r' % short_term)
 
-    deep_ens_bo(x_train, y_train, x_test, y_test)
+    simple_nn_aleo_bo(x_train, y_train, x_test, y_test)
 
 
 def deep_gp_bo(x_train, y_train, x_test, y_test):
+    print('Deep GP')
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
         module__input_size=x_train.shape[-1],
@@ -67,6 +69,7 @@ def deep_gp_bo(x_train, y_train, x_test, y_test):
 
 
 def bnn_bo(x_train, y_train, x_test, y_test):
+    print('Bayesian Neural Network')
     bnn = BNNSkorch(
         module=TorchBNN,
         module__input_size=x_train.shape[-1],
@@ -126,7 +129,8 @@ def deep_ens_bo(x_train, y_train, x_test, y_test):
 
 
 def fnp_bo(x_train, y_train, x_test, y_test):
-    cv = 5
+    cv = 4
+    print('Functional Neural Processes')
     fnp = RegressionFNPSkorch(
         module=RegressionFNP,
         module__dim_x=x_train.shape[-1],
@@ -135,28 +139,36 @@ def fnp_bo(x_train, y_train, x_test, y_test):
         optimizer=torch.optim.Adam,
         device=device,
         train_size=int((1 - 1 / cv) * x_train.shape[0]),
-        verbose=0
+        verbose=0,
+        module__dim_u=3,
+        module__dim_z=50,
+        module__fb_z=1.0,
+        lr=0.001,
+        reference_set_size_ratio=0.15,
+        max_epochs=100,
+        batch_size=128
     )
 
     space = {
-        'lr': Real(0.001, 0.01, 'log-uniform'),
-        'max_epochs': Integer(1, 2),
-        'batch_size': [32, 64, 128],
-        'module__dim_u': Integer(1, 16),
-        'module__dim_z': Integer(8, 128),
-        'module__fb_z': Real(0, 2.0),
-        'reference_set_size_ratio': Real(0.01, 0.4),
-        'module__hidden_size_enc_0': Integer(64, 256),
-        'module__hidden_size_enc_1': Integer(64, 512),
-        'module__hidden_size_dec_0': Integer(16, 256),
-        'module__hidden_size_dec_1': Integer(16, 512),
+        # 'lr': Real(0.001, 0.01, 'log-uniform'),
+        # 'max_epochs': Integer(1, 2),
+        # 'batch_size': [32, 64, 128],
+        # 'module__dim_u': Integer(1, 16),
+        # 'module__dim_z': Integer(8, 128),
+        # 'module__fb_z': Real(0, 2.0),
+        # 'reference_set_size_ratio': Real(0.01, 0.4),
+        'module__hidden_size_enc_0': Integer(1, 256),
+        'module__hidden_size_enc_1': Integer(1, 256),
+        'module__hidden_size_dec_0': Integer(1, 256),
+        'module__hidden_size_dec_1': Integer(1, 256),
     }
 
-    bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=1024, cv=cv)
+    bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=200, cv=cv)
 
 
 def concrete_bo(x_train, y_train, x_test, y_test):
-    cv = 5
+    cv = 4
+    print('Concrete Dropout')
     concrete = ConcreteSkorch(module=ConcreteDropoutNN,
                               module__input_size=x_train.shape[-1],
                               module__output_size=y_train.shape[-1] * 2,
@@ -214,18 +226,18 @@ def simple_nn_bo(x_train, y_train, x_test, y_test):
 
 def simple_nn_aleo_bo(x_train, y_train, x_test, y_test):
     print('Simple NN Aleo')
-    # simle nn as comparison, optimize hyperparameters using bayesian optimization
-    simple_nn = BaseNNSkorch(module=SimpleNN,
-                             module__input_size=x_train.shape[-1],
-                             module__output_size=y_train.shape[-1],
-                             optimizer=torch.optim.Adam,
-                             criterion=HeteroscedasticLoss,
-                             device=device,
-                             lr=0.0015,
-                             max_epochs=150,
-                             batch_size=1024,
-                             train_split=None,
-                             verbose=0)
+    simple_nn = AleatoricNNSkorch(
+        module=SimpleNN,
+        module__input_size=x_train.shape[-1],
+        module__output_size=y_train.shape[-1] * 2,
+        optimizer=torch.optim.Adam,
+        criterion=HeteroscedasticLoss,
+        device=device,
+        lr=0.0015,
+        max_epochs=135,
+        batch_size=1024,
+        train_split=None,
+        verbose=0)
 
     space = {
         # 'lr': Real(0.01, 0.1, 'log-uniform'),
@@ -237,7 +249,7 @@ def simple_nn_aleo_bo(x_train, y_train, x_test, y_test):
         # 'module__dropout_prob': Real(0, 0.5)
     }
 
-    bayesian_optimization(simple_nn, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=200)
+    bayesian_optimization(simple_nn, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=200)
 
 
 if __name__ == '__main__':

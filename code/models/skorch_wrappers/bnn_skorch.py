@@ -1,10 +1,10 @@
 from skorch.utils import to_tensor
 from torchbnn import BKLLoss
-from models.skorch_wrappers.aleotoric_nn_skorch import AleotoricNNSkorch
+from models.skorch_wrappers.combined_unc_nn_skorch import CombinedUncNNSkorch
 
 
 # wrapper for bnn (mainly because of loss)
-class BNNSkorch(AleotoricNNSkorch):
+class BNNSkorch(CombinedUncNNSkorch):
     def __init__(self, bkl=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Variatonal inference (sums up kl loss for layers)

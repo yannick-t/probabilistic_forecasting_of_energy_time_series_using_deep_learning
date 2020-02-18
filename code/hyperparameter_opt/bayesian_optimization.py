@@ -8,7 +8,7 @@ counter = 0
 opt = None
 
 
-def bayesian_optimization(model, space, scorer, x_train, y_train, x_test, y_test, n_iter=256, cv=5, n_jobs=None):
+def bayesian_optimization(model, space, scorer, x_train, y_train, x_test, y_test, n_iter=256, cv=4, n_jobs=None):
     global counter
     global opt
 

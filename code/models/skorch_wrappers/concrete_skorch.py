@@ -3,11 +3,11 @@ import numpy as np
 import torch
 from skorch.utils import to_numpy, to_tensor
 
-from models.skorch_wrappers.aleotoric_nn_skorch import AleotoricNNSkorch
+from models.skorch_wrappers.combined_unc_nn_skorch import CombinedUncNNSkorch
 
 
 # wrapper for concrete dropout to supply lengthscale and automatically calculate the regularization parameters
-class ConcreteSkorch(AleotoricNNSkorch):
+class ConcreteSkorch(CombinedUncNNSkorch):
     def __init__(self, lengthscale, dataset_size, *args, **kwargs):
 
         self.lengthscale = lengthscale
