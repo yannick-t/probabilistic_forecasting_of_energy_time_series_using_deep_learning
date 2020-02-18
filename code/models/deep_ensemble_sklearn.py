@@ -17,7 +17,7 @@ from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 
 class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
     def __init__(self, input_size, output_size, optimizer, criterion, device='cpu',
-                 batch_size=128, max_epochs=100, lr=0.001, ensemble_size=5, **kwargs):
+                 batch_size=128, max_epochs=100, lr=0.001, ensemble_size=5, parallel=True, **kwargs):
         self.input_size = input_size
         self.output_size = output_size
         self.optimizer = optimizer
@@ -27,6 +27,7 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
         self.max_epochs = max_epochs
         self.lr = lr
         self.ensemble_size = ensemble_size
+        self.parallel = parallel
         self.hidden_size = hidden_size_extract(kwargs, 'hidden_size')
 
         self.models = []
@@ -37,7 +38,7 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
             model.initialize()
 
     def set_params(self, **params):
-        self.hidden_size = hidden_size_extract(params, 'hidden_size',
+        self.hidden_size = hidden_size_extract(params, 'module__hidden_size',
                                                delete_from_dict=True)  # for sklearn consistency
         super(DeepEnsemble, self).set_params(**params)
         self.init_ensemble()
@@ -56,9 +57,13 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
     def fit(self, X, y):
         # fit each with shuffled copies of the training data separately
         # according to original paper
-        pool = Pool(self.ensemble_size)
         args = [(model, X, y) for model in self.models]
-        self.models = pool.starmap(self.fit_single, args)
+
+        if self.parallel:
+            pool = Pool(self.ensemble_size)
+            self.models = pool.starmap(self.fit_single, args)
+        else:
+            self.models = [self.fit_single(*a) for a in args]
 
         return self
 

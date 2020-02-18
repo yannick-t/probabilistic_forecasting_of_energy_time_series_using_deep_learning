@@ -29,8 +29,8 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    short_term = False
-    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=True, reprocess=False)
+    short_term = True
+    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False)
 
     x_train, y_train, offset_train = dataset_df_to_np(train_df)
     x_test, y_test, offset_test = dataset_df_to_np(test_df)
@@ -39,7 +39,7 @@ def main():
     print('OPSD ENTSOE-E Transparency')
     print('short term: %r' % short_term)
 
-    simple_nn_bo(x_train, y_train, x_test, y_test)
+    deep_ens_bo(x_train, y_train, x_test, y_test)
 
 
 def deep_gp_bo(x_train, y_train, x_test, y_test):
@@ -98,28 +98,31 @@ def bnn_bo(x_train, y_train, x_test, y_test):
 
 
 def deep_ens_bo(x_train, y_train, x_test, y_test):
+    print('Deep Ensemble')
     deep_ens = DeepEnsemble(
         input_size=x_train.shape[-1],
         output_size=y_train.shape[-1] * 2,
-        lr=0.001,
-        max_epochs=2000,
+        lr=0.0015,
+        max_epochs=30,
         batch_size=1024,
         optimizer=torch.optim.Adam,
         criterion=HeteroscedasticLoss,
-        device=device
+        device=device,
+        parallel=False,
+        verbose=1
     )
 
     space = {
         # 'lr': Real(0.01, 0.1, 'log-uniform'),
-        'hidden_size_0': Integer(16, 1024),
-        'hidden_size_1': Integer(16, 1024),
-        'hidden_size_2': Integer(1, 1024),
-        'hidden_size_3': Integer(1, 1024),
+        'module__hidden_size_0': Integer(1, 256),
+        'module__hidden_size_1': Integer(1, 256),
+        'module__hidden_size_2': Integer(1, 256),
+        'module__hidden_size_3': Integer(1, 256),
         # 'hidden_size_4': Integer(1, 1024),
         # 'hidden_size_5': Integer(1, 1024),
     }
 
-    bayesian_optimization(deep_ens, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=512)
+    bayesian_optimization(deep_ens, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=10)
 
 
 def fnp_bo(x_train, y_train, x_test, y_test):
@@ -162,7 +165,7 @@ def concrete_bo(x_train, y_train, x_test, y_test):
                               sample_count=30,
                               lr=0.001,
                               train_split=None,
-                              max_epochs=200,
+                              max_epochs=108,
                               batch_size=1024,
                               optimizer=torch.optim.Adam,
                               criterion=HeteroscedasticLoss,
@@ -191,7 +194,7 @@ def simple_nn_bo(x_train, y_train, x_test, y_test):
                              criterion=torch.nn.MSELoss,
                              device=device,
                              lr=0.0015,
-                             max_epochs=108,
+                             max_epochs=150,
                              batch_size=1024,
                              train_split=None,
                              verbose=0)
@@ -209,4 +212,33 @@ def simple_nn_bo(x_train, y_train, x_test, y_test):
     bayesian_optimization(simple_nn, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=200)
 
 
-main()
+def simple_nn_aleo_bo(x_train, y_train, x_test, y_test):
+    print('Simple NN Aleo')
+    # simle nn as comparison, optimize hyperparameters using bayesian optimization
+    simple_nn = BaseNNSkorch(module=SimpleNN,
+                             module__input_size=x_train.shape[-1],
+                             module__output_size=y_train.shape[-1],
+                             optimizer=torch.optim.Adam,
+                             criterion=HeteroscedasticLoss,
+                             device=device,
+                             lr=0.0015,
+                             max_epochs=150,
+                             batch_size=1024,
+                             train_split=None,
+                             verbose=0)
+
+    space = {
+        # 'lr': Real(0.01, 0.1, 'log-uniform'),
+        # 'max_epochs': Integer(25, 500),
+        'module__hidden_size_0': Integer(1, 256),
+        'module__hidden_size_1': Integer(1, 256),
+        'module__hidden_size_2': Integer(1, 256),
+        'module__hidden_size_3': Integer(1, 256),
+        # 'module__dropout_prob': Real(0, 0.5)
+    }
+
+    bayesian_optimization(simple_nn, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=200)
+
+
+if __name__ == '__main__':
+    main()
