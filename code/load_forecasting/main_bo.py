@@ -28,7 +28,8 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=True, reprocess=False)
+    short_term = False
+    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False)
 
     y_train, offset_train = train_df.loc[:, 'target'].to_numpy().reshape(-1, 1), train_df.loc[:, 'offset'].to_numpy()\
         .reshape(-1, 1)
@@ -36,6 +37,10 @@ def main():
     y_test, offset_test = test_df.loc[:, 'target'].to_numpy().reshape(-1, 1), test_df.loc[:, 'offset'].to_numpy()\
         .reshape(-1, 1)
     x_test = test_df.drop(columns=['target', 'offset']).to_numpy()
+
+    print('Bayesian Optimization')
+    print('OPSD ENTSOE-E Transparency')
+    print('short term: %r' % short_term)
 
     simple_nn_bo(x_train, y_train, x_test, y_test)
 
@@ -53,11 +58,11 @@ def deep_gp_bo(x_train, y_train, x_test, y_test):
         num_data=x_train.shape[0],
         device=device)
 
-    space = {'lr': Real(0.001, 0.03, 'log-uniform'),
+    space = {# 'lr': Real(0.001, 0.03, 'log-uniform'),
              'module__hidden_size_0': Integer(1, 4),
              'module__hidden_size_1': Integer(1, 8),
              'module__hidden_size_2': Integer(1, 4),
-             'module__num_inducing': Integer(16, 512),
+             # 'module__num_inducing': Integer(16, 512),
              }
 
     bayesian_optimization(dgp, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=256,
@@ -181,6 +186,7 @@ def concrete_bo(x_train, y_train, x_test, y_test):
 
 
 def simple_nn_bo(x_train, y_train, x_test, y_test):
+    print('Simple NN')
     # simle nn as comparison, optimize hyperparameters using bayesian optimization
     simple_nn = BaseNNSkorch(module=SimpleNN,
                              module__input_size=x_train.shape[-1],
@@ -189,7 +195,7 @@ def simple_nn_bo(x_train, y_train, x_test, y_test):
                              criterion=torch.nn.MSELoss,
                              device=device,
                              lr=0.0015,
-                             max_epochs=200,
+                             max_epochs=108,
                              batch_size=1024,
                              train_split=None,
                              verbose=0)
