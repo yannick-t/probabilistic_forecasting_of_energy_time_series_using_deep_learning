@@ -48,18 +48,24 @@ def main():
     np.random.seed(333)
     y_test_orig = scaler.inverse_transform(y_test) + offset_test
 
-    reg = simple_nn_init(x_train, y_train)
-    train_time_simple = load_train(reg, x_train, y_train, 'simple_nn', model_folder=model_folder,
-                                   model_prefix=model_prefix, load_saved=False)
-
-    pred = reg.predict(x_test)
-    pred = scaler.inverse_transform(pred) + offset_test
-    assert pred.shape == y_test.shape
-
-    print('###############################')
-    print('Simple NN:')
-    print("RMSE: %.4f" % rmse(pred, y_test_orig))
-    print("MAPE: %.2f" % mape(pred, y_test_orig))
+    # reg = simple_nn_init(x_train, y_train)
+    # train_time_simple = load_train(reg, x_train, y_train, 'simple_nn', model_folder=model_folder,
+    #                                model_prefix=model_prefix, load_saved=False)
+    #
+    # pred = reg.predict(x_test)
+    # pred = scaler.inverse_transform(pred) + offset_test
+    # assert pred.shape == y_test.shape
+    #
+    # print('###############################')
+    # print('Simple NN:')
+    # print("RMSE: %.4f" % rmse(pred, y_test_orig))
+    # print("MAPE: %.2f" % mape(pred, y_test_orig))
+    #
+    fnp = fnp_init(x_train, y_train)
+    train_time_fnp = load_train(fnp, x_train, y_train, 'fnp', load_saved=False, model_folder=model_folder, model_prefix=model_prefix)
+    fnp.choose_r(x_train, y_train)  # set up reference set in case the model was loaded
+    pred_mean, pred_var, _ = predict_transform(fnp, x_test, scaler, offset_test, 'fnp')
+    evaluate_single(pred_mean, pred_var, y_test_orig)
 
     # concrete = concrete_init(x_train, y_train)
     # train_time_conc = load_train(concrete, x_train, y_train, 'concrete', model_folder, model_prefix, load_saved=True)
@@ -184,17 +190,18 @@ def fnp_init(x_train, y_train):
         module=RegressionFNP,
         module__dim_x=x_train.shape[-1],
         module__dim_y=y_train.shape[-1],
-        module__hidden_size_enc=[64, 128, 19],
-        module__hidden_size_dec=[128, 32],
-        module__dim_u=12,
-        module__dim_z=8,
-        module__fb_z=1.0,
+        module__hidden_size_enc=[64, 64],
+        module__hidden_size_dec=[64, 64],
         optimizer=torch.optim.Adam,
         device=device,
         seed=42,
-        max_epochs=64,
-        batch_size=64,
-        reference_set_size_ratio=0.1,
+        module__dim_u=3,
+        module__dim_z=50,
+        module__fb_z=1.0,
+        lr=0.001,
+        reference_set_size_ratio=0.05,
+        max_epochs=5,
+        batch_size=128,
         train_size=x_train.size,
         train_split=None,
         verbose=1
