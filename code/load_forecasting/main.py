@@ -47,7 +47,7 @@ def main():
 
     np.random.seed(333)
     y_test_orig = scaler.inverse_transform(y_test) + offset_test
-
+    #
     # reg = simple_nn_init(x_train, y_train)
     # train_time_simple = load_train(reg, x_train, y_train, 'simple_nn', model_folder=model_folder,
     #                                model_prefix=model_prefix, load_saved=False)
@@ -60,12 +60,12 @@ def main():
     # print('Simple NN:')
     # print("RMSE: %.4f" % rmse(pred, y_test_orig))
     # print("MAPE: %.2f" % mape(pred, y_test_orig))
-    #
-    fnp = fnp_init(x_train, y_train)
-    train_time_fnp = load_train(fnp, x_train, y_train, 'fnp', load_saved=False, model_folder=model_folder, model_prefix=model_prefix)
-    fnp.choose_r(x_train, y_train)  # set up reference set in case the model was loaded
-    pred_mean, pred_var, _ = predict_transform(fnp, x_test, scaler, offset_test, 'fnp')
-    evaluate_single(pred_mean, pred_var, y_test_orig)
+    # #
+    # fnp = fnp_init(x_train, y_train)
+    # train_time_fnp = load_train(fnp, x_train, y_train, 'fnp', load_saved=False, model_folder=model_folder, model_prefix=model_prefix)
+    # fnp.choose_r(x_train, y_train)  # set up reference set in case the model was loaded
+    # pred_mean, pred_var, _ = predict_transform(fnp, x_test, scaler, offset_test, 'fnp')
+    # evaluate_single(pred_mean, pred_var, y_test_orig)
 
     # concrete = concrete_init(x_train, y_train)
     # train_time_conc = load_train(concrete, x_train, y_train, 'concrete', model_folder, model_prefix, load_saved=True)
@@ -73,11 +73,11 @@ def main():
     #
     # evaluate_single(pred_mean, pred_var, y_test_orig)
 
-    # deep_gp = deep_gp_init(x_train, y_train)
-    # load_train(deep_gp, x_train, y_train, 'deep_gp', model_folder, model_prefix, load_saved=False)
-    # pred_mean, pred_var, _ = predict_transform(deep_gp, x_test, scaler, offset_test, 'deep_gp')
+    deep_gp = deep_gp_init(x_train, y_train)
+    load_train(deep_gp, x_train, y_train, 'deep_gp', model_folder, model_prefix, load_saved=False)
+    pred_mean, pred_var, _ = predict_transform(deep_gp, x_test, scaler, offset_test, 'deep_gp')
 
-    # evaluate_single(pred_mean, pred_var, y_test_orig)
+    evaluate_single(pred_mean, pred_var, y_test_orig)
 
     # horizon = 1440  # horizon in minutes
     # pred_multi = predict_multi_step(reg, test_df, lagged_short_term=[-60, -120, -180, -15, -30, -45], horizon=horizon)
@@ -130,7 +130,7 @@ def simple_nn_init(x_train, y_train):
         module=SimpleNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1],
-        module__hidden_size=[128],
+        module__hidden_size=[32, 48, 7],
         lr=0.0015,
         batch_size=1024,
         max_epochs=200,
@@ -149,12 +149,12 @@ def deep_gp_init(x_train, y_train):
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
         module__input_size=x_train.shape[-1],
-        module__hidden_size=[1],
+        module__hidden_size=[3],
         module__output_size=y_train.shape[-1] * 2,
         module__num_inducing=128,
         lr=0.01,
         max_epochs=4,
-        batch_size=128,
+        batch_size=1024,
         train_split=None,
         verbose=1,
         optimizer=torch.optim.Adam,
@@ -201,7 +201,7 @@ def fnp_init(x_train, y_train):
         lr=0.001,
         reference_set_size_ratio=0.05,
         max_epochs=5,
-        batch_size=128,
+        batch_size=1024,
         train_size=x_train.size,
         train_split=None,
         verbose=1

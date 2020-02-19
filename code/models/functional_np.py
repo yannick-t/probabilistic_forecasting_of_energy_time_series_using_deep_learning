@@ -32,7 +32,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 
 from models.base_nn import BaseNN, hidden_size_extract
-from models.fnp_utils import Normal, float_tensor, logitexp, sample_DAG, sample_bipartite, Flatten, one_hot
+from models.fnp_utils import Normal, logitexp, sample_DAG, sample_bipartite, Flatten, one_hot
 
 
 class RegressionFNP(nn.Module):
@@ -68,10 +68,10 @@ class RegressionFNP(nn.Module):
         # normalizes the graph such that inner products correspond to averages of the parents
         self.norm_graph = lambda x: x / (torch.sum(x, 1, keepdim=True) + 1e-8)
 
-        self.register_buffer('lambda_z', float_tensor(1).fill_(1e-8))
+        self.register_buffer('lambda_z', torch.Tensor(1).fill_(1e-8))
 
         # function that assigns the edge probabilities in the graph
-        self.pairwise_g_logscale = nn.Parameter(float_tensor(1).fill_(math.log(math.sqrt(self.dim_u))))
+        self.pairwise_g_logscale = nn.Parameter(torch.Tensor(1).fill_(math.log(math.sqrt(self.dim_u))))
         self.pairwise_g = lambda x: logitexp(-.5 * torch.sum(torch.pow(x[:, self.dim_u:] - x[:, 0:self.dim_u], 2), 1,
                                                              keepdim=True) / self.pairwise_g_logscale.exp()).view(x.size(0), 1)
         # transformation of the input
@@ -244,10 +244,10 @@ class ClassificationFNP(nn.Module):
         # normalizes the graph such that inner products correspond to averages of the parents
         self.norm_graph = lambda x: x / (torch.sum(x, 1, keepdim=True) + 1e-8)
 
-        self.register_buffer('lambda_z', float_tensor(1).fill_(1e-8))
+        self.register_buffer('lambda_z', torch.Tensor(1).fill_(1e-8))
 
         # function that assigns the edge probabilities in the graph
-        self.pairwise_g_logscale = nn.Parameter(float_tensor(1).fill_(math.log(math.sqrt(self.dim_u))))
+        self.pairwise_g_logscale = nn.Parameter(torch.Tensor(1).fill_(math.log(math.sqrt(self.dim_u))))
         self.pairwise_g = lambda x: logitexp(-.5 * torch.sum(torch.pow(x[:, self.dim_u:] - x[:, 0:self.dim_u], 2), 1,
                                                              keepdim=True) / self.pairwise_g_logscale.exp()).view(x.size(0), 1)
 
@@ -340,7 +340,7 @@ class ClassificationFNP(nn.Module):
 
         qz_mean_R, qz_logscale_R = torch.split(self.q_z(H_all[0:XR.size(0)]), self.dim_z, 1)
 
-        logits = float_tensor(x_new.size(0), self.dim_y, n_samples)
+        logits = torch.Tensor(x_new.size(0), self.dim_y, n_samples)
         for i in range(n_samples):
             u = pu.rsample()
 

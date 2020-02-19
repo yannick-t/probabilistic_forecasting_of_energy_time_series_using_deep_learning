@@ -32,9 +32,6 @@ import numpy as np
 from torch.distributions import Bernoulli
 from itertools import product
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-float_tensor = torch.cuda.DoubleTensor if torch.cuda.is_available() else torch.DoubleTensor
-
 
 def logitexp(logp):
     # https: // github.com / pytorch / pytorch / issues / 4007
@@ -46,7 +43,7 @@ def logitexp(logp):
 
 
 def one_hot(x, n_classes=10):
-    x_onehot = float_tensor(x.size(0), n_classes).zero_()
+    x_onehot = torch.Tensor(x.size(0), n_classes, device=x.device).zero_()
     x_onehot.scatter_(1, x[:, None], 1)
 
     return x_onehot
@@ -80,7 +77,7 @@ class Normal(object):
         return log_prob
 
     def sample(self, **kwargs):
-        eps = torch.normal(float_tensor(self.means.size()).zero_(), float_tensor(self.means.size()).fill_(1))
+        eps = torch.normal(torch.Tensor(self.means.size()).zero_(), torch.Tensor(self.means.size()).fill_(1))
         return self.means + self.logscales.exp() * eps
 
     def rsample(self, **kwargs):
@@ -117,7 +114,7 @@ def sample_DAG(Z, g, training=True, temperature=0.3):
         G = p_edges.sample()
 
     # embed the upper triangular to the adjacency matrix
-    unsorted_G = float_tensor(Z.size(0), Z.size(0)).zero_()
+    unsorted_G = torch.Tensor(Z.size(0), Z.size(0)).zero_()
     unsorted_G[idx_utr[0], idx_utr[1]] = G.squeeze()
     # unsort the dag to conform to the data order
     original_idx = torch.sort(sort_idx)[1]
@@ -146,7 +143,7 @@ def sample_bipartite(Z1, Z2, g, training=True, temperature=0.3):
         A_vals = p_edges.sample()
 
     # embed the values to the adjacency matrix
-    A = float_tensor(Z1.size(0), Z2.size(0)).zero_()
+    A = torch.Tensor(Z1.size(0), Z2.size(0)).zero_()
     A[indices[:, 0], indices[:, 1]] = A_vals.squeeze()
 
     return A
