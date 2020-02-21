@@ -188,10 +188,9 @@ def concrete_bo(x_train, y_train, x_test, y_test):
         # 'lr': Real(0.001, 0.04, 'log-uniform'),
         # 'lengthscale': Real(1e-8, 0.1, 'log-uniform'),
         # 'max_epochs': Integer(50, 1000),
-        'module__hidden_size_0': Integer(1, 128),
-        'module__hidden_size_1': Integer(1, 128),
-        'module__hidden_size_2': Integer(1, 256),
-        'module__hidden_size_3': Integer(1, 128),
+        'module__hidden_size_0': Integer(4, 133),
+        'module__hidden_size_1': Integer(8, 80),
+        'module__hidden_size_2': Integer(1, 64),
     }
     bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=200, cv=cv)
 
@@ -214,10 +213,9 @@ def simple_nn_bo(x_train, y_train, x_test, y_test):
     space = {
         # 'lr': Real(0.01, 0.1, 'log-uniform'),
         # 'max_epochs': Integer(25, 500),
-        'module__hidden_size_0': Integer(1, 128),
-        'module__hidden_size_1': Integer(1, 128),
-        'module__hidden_size_2': Integer(1, 256),
-        'module__hidden_size_3': Integer(1, 128),
+        'module__hidden_size_0': Integer(4, 133),
+        'module__hidden_size_1': Integer(8, 80),
+        'module__hidden_size_2': Integer(1, 64),
         # 'module__dropout_prob': Real(0, 0.5)
     }
 
@@ -242,10 +240,9 @@ def simple_nn_aleo_bo(x_train, y_train, x_test, y_test):
     space = {
         # 'lr': Real(0.01, 0.1, 'log-uniform'),
         # 'max_epochs': Integer(25, 500),
-        'module__hidden_size_0': Integer(1, 256),
-        'module__hidden_size_1': Integer(1, 256),
-        'module__hidden_size_2': Integer(1, 256),
-        'module__hidden_size_3': Integer(1, 256),
+        'module__hidden_size_0': Integer(4, 133),
+        'module__hidden_size_1': Integer(8, 80),
+        'module__hidden_size_2': Integer(1, 64),
         # 'module__dropout_prob': Real(0, 0.5)
     }
 

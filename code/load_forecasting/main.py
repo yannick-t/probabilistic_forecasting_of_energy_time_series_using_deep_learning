@@ -16,6 +16,7 @@ from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
 from models.simple_nn import SimpleNN
+from models.skorch_wrappers.aleotoric_nn_skorch import AleatoricNNSkorch
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from models.skorch_wrappers.bnn_skorch import BNNSkorch
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
@@ -73,9 +74,15 @@ def main():
     #
     # evaluate_single(pred_mean, pred_var, y_test_orig)
 
-    deep_gp = deep_gp_init(x_train, y_train)
-    load_train(deep_gp, x_train, y_train, 'deep_gp', model_folder, model_prefix, load_saved=False)
-    pred_mean, pred_var, _ = predict_transform(deep_gp, x_test, scaler, offset_test, 'deep_gp')
+    # deep_gp = deep_gp_init(x_train, y_train)
+    # load_train(deep_gp, x_train, y_train, 'deep_gp', model_folder, model_prefix, load_saved=False)
+    # pred_mean, pred_var, _ = predict_transform(deep_gp, x_test, scaler, offset_test, 'deep_gp')
+    #
+    # evaluate_single(pred_mean, pred_var, y_test_orig)
+
+    simple_nn_aleo = simple_aleo_nn_init(x_train, y_train)
+    load_train(simple_nn_aleo, x_train, y_train, 'simple_nn_aleo', model_folder, model_prefix, load_saved=False)
+    pred_mean, pred_var, _ = predict_transform(simple_nn_aleo, x_test, scaler, offset_test, 'deep_gp')
 
     evaluate_single(pred_mean, pred_var, y_test_orig)
 
@@ -122,6 +129,27 @@ def init_train_eval_all(x_train, y_train, x_test, y_test, y_test_orig, x_ood_ran
         pred_times[0], pred_times[1], pred_times[2], pred_times[3], pred_times[4]))
 
     evaluate_multiple(names, pred_means, pred_vars, y_test_orig, pred_ood_vars)
+
+
+def simple_aleo_nn_init(x_train, y_train):
+    es = EarlyStopping(patience=75)
+    simple_nn = AleatoricNNSkorch(
+        module=SimpleNN,
+        module__input_size=x_train.shape[-1],
+        module__output_size=y_train.shape[-1] * 2,
+        module__hidden_size=[4, 77, 33],
+        lr=0.0015,
+        batch_size=1024,
+        max_epochs=200,
+        train_split=None,
+        optimizer=torch.optim.Adam,
+        criterion=HeteroscedasticLoss,
+        device=device,
+        verbose=1,
+        # callbacks=[es]
+    )
+
+    return simple_nn
 
 
 def simple_nn_init(x_train, y_train):
