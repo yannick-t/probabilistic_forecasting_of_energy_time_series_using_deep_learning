@@ -6,12 +6,12 @@ from datetime import timedelta
 from util.data.data_tools import inverse_transform_normal
 
 
-def predict_transform_multiple(models, names, x_test, scaler):
+def predict_transform_multiple(models, x_test, offset_test, scaler):
     pred_means = []
     pred_vars = []
     times = []
-    for name, model in zip(names, models):
-        pmean, pvar, time = predict_transform(model, x_test, scaler, name)
+    for name in models:
+        pmean, pvar, time = predict_transform(models[name], x_test, offset_test, scaler, name)
         pred_means.append(pmean)
         pred_vars.append(pvar)
         times.append(time)

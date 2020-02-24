@@ -6,6 +6,7 @@ import torch
 import numpy as np
 from sklearn.model_selection import train_test_split
 from skorch.callbacks import EarlyStopping
+import pandas as pd
 
 from evaluation.evaluate_forecasting_util import plot_test_data, evaluate_multiple, evaluate_multi_step, evaluate_single
 from evaluation.scoring import rmse, mape, crps, log_likelihood
@@ -27,144 +28,95 @@ from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 from training.training_util import load_train
 from util.data.data_src_tools import load_opsd_de_load_statistics, load_opsd_de_load_transparency, load_opsd_de_load_dataset
-from util.data.data_tools import inverse_transform_normal, preprocess_load_data_forec
 import time
+
+from util.data.data_tools import gen_synth_ood_data_like
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
 
 device = torch.device('cuda' if use_cuda else 'cpu')
 
-model_folder = './trained_models/'
-model_prefix = 'load_forecasting_'
-
 
 def main():
-    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=True, reprocess=False, n_ahead=1)
+    short_term = True
+
+    # trained model location and prefix
+    model_folder = './trained_models/'
+    model_prefix = 'load_forecasting_'
+
+    if short_term:
+        model_prefix = model_prefix + 'short_term_'
+
+    # load / preprocess dataset if needed
+    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False, n_ahead=1)
 
     x_train, y_train, offset_train = dataset_df_to_np(train_df)
     x_test, y_test, offset_test = dataset_df_to_np(test_df)
     timestamp_test = test_df.index.to_numpy()
 
-    np.random.seed(333)
     y_test_orig = scaler.inverse_transform(y_test) + offset_test
-    #
-    # reg = simple_nn_init(x_train, y_train)
-    # train_time_simple = load_train(reg, x_train, y_train, 'simple_nn', model_folder=model_folder,
-    #                                model_prefix=model_prefix, load_saved=False)
-    #
-    # pred = reg.predict(x_test)
-    # pred = scaler.inverse_transform(pred) + offset_test
-    # assert pred.shape == y_test.shape
-    #
-    # print('###############################')
-    # print('Simple NN:')
-    # print("RMSE: %.4f" % rmse(pred, y_test_orig))
-    # print("MAPE: %.2f" % mape(pred, y_test_orig))
-    # #
-    # fnp = fnp_init(x_train, y_train)
-    # train_time_fnp = load_train(fnp, x_train, y_train, 'fnp', load_saved=False, model_folder=model_folder, model_prefix=model_prefix)
-    # fnp.choose_r(x_train, y_train)  # set up reference set in case the model was loaded
-    # pred_mean, pred_var, _ = predict_transform(fnp, x_test, scaler, offset_test, 'fnp')
-    # evaluate_single(pred_mean, pred_var, y_test_orig)
 
-    # concrete = concrete_init(x_train, y_train)
-    # train_time_conc = load_train(concrete, x_train, y_train, 'concrete', model_folder, model_prefix, load_saved=True)
-    # pred_mean, pred_var, _ = predict_transform(concrete, x_test, scaler, offset_test, 'concrete')
-    #
-    # evaluate_single(pred_mean, pred_var, y_test_orig)
+    # random data to serve as out of distribution data
+    # to test epistemic unc. capabilities of models
+    ood_df = gen_synth_ood_data_like(test_df, short_term=short_term)
+    x_ood, _, offset_ood = dataset_df_to_np(ood_df)
 
-    # deep_gp = deep_gp_init(x_train, y_train)
-    # load_train(deep_gp, x_train, y_train, 'deep_gp', model_folder, model_prefix, load_saved=False)
-    # pred_mean, pred_var, _ = predict_transform(deep_gp, x_test, scaler, offset_test, 'deep_gp')
-    #
-    # evaluate_single(pred_mean, pred_var, y_test_orig)
-
-    simple_nn_aleo = simple_aleo_nn_init(x_train, y_train)
-    load_train(simple_nn_aleo, x_train, y_train, 'simple_nn_aleo', model_folder, model_prefix, load_saved=False)
-    pred_mean, pred_var, _ = predict_transform(simple_nn_aleo, x_test, scaler, offset_test, 'deep_gp')
-
-    evaluate_single(pred_mean, pred_var, y_test_orig)
-
-    # horizon = 1440  # horizon in minutes
-    # pred_multi = predict_multi_step(reg, test_df, lagged_short_term=[-60, -120, -180, -15, -30, -45], horizon=horizon)
-    # assert pred_multi.shape == (y_test.shape[0], horizon // 15)
-    # evaluate_multi_step(pred_multi, y_test_orig, offset_test, scaler)
-
-    # ax = plt.subplot(1, 1, 1)
-    # plot_test_data(pred, np.ones_like(pred) * 0.1, y_test_orig, timestamp_test, ax)
-    # ax = plt.subplot(1, 2, 2)
-    # pred_simple_train = reg.predict(x_train)
-    # plot_test_data(pred_simple_train, np.ones_like(pred_simple_train) * 0.01, y_train, timestamp_train, ax)
-    # plt.show()
+    init_train_eval_single(simple_aleo_nn_init, x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
+                           model_prefix, 'simple_nn_aleo')
 
 
-def init_train_eval_all(x_train, y_train, x_test, y_test, y_test_orig, x_ood_rand, scaler):
-    concrete = concrete_init(x_train, y_train)
-    train_time_conc = load_train(concrete, x_train, y_train, 'concrete', load_saved=True, model_folder=model_folder, model_prefix=model_prefix)
+def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
+                           model_prefix, name):
+    model = init_fn(x_train, y_train)
+    load_train(model, x_train, y_train, name, model_folder, model_prefix, load_saved=False)
+    pred_mean, pred_var, _ = predict_transform(model, x_test, scaler, offset_test, name)
+    _, pred_ood_var, _ = predict_transform(model, x_ood, scaler, offset_ood, name)
 
-    fnp = fnp_init(x_train, y_train)
-    train_time_fnp = load_train(fnp, x_train, y_train, 'fnp', load_saved=True, model_folder=model_folder, model_prefix=model_prefix)
-    fnp.choose_r(x_train, y_train)  # set up reference set in case the model was loaded
-
-    deep_ens = deep_ensemble_init(x_train, y_train)
-    train_time_deep_ens = load_train(deep_ens, x_train, y_train, 'deep_ens', load_saved=True, model_folder=model_folder, model_prefix=model_prefix)
-
-    bnn = bnn_init(x_train, y_train)
-    train_time_bnn = load_train(bnn, x_train, y_train, 'bnn', load_saved=True, model_folder=model_folder, model_prefix=model_prefix)
-
-    dgp = deep_gp_init(x_train, y_train)
-    train_time_deepgp = load_train(dgp, x_train, y_train, 'deep_gp', load_saved=True, model_folder=model_folder, model_prefix=model_prefix)
-
-    names = ['Concrete', 'FNP', 'Deep Ens.', 'BNN', 'Deep GP']
-    models = [concrete, fnp, deep_ens, bnn, dgp]
-
-    pred_means, pred_vars, pred_times = predict_transform_multiple(models, names, x_test, scaler)
-    _, pred_ood_vars, _ = predict_transform_multiple(models, names, x_ood_rand, scaler)
+    evaluate_single(pred_mean, pred_var, y_test_orig, pred_ood_var)
 
 
-    print('train times: %d, %d, %d, %d, %d' % (
-        train_time_conc, train_time_fnp, train_time_deep_ens, train_time_bnn, train_time_deepgp))
-    print('pred times: %d, %d, %d, %d, %d' % (
-        pred_times[0], pred_times[1], pred_times[2], pred_times[3], pred_times[4]))
+def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood_rand, scaler, model_folder, model_prefix):
+    models = {}
 
-    evaluate_multiple(names, pred_means, pred_vars, y_test_orig, pred_ood_vars)
+    models['simple_nn_aleo'] = simple_aleo_nn_init(x_train, y_train)
+    models['concrete'] = concrete_init(x_train, y_train)
+    models['fnp'] = fnp_init(x_train, y_train)
+    models['deep_ens'] = deep_ensemble_init(x_train, y_train)
+    models['bnn'] = bnn_init(x_train, y_train)
+    models['dgp'] = deep_gp_init(x_train, y_train)
+
+    time_df = pd.DataFrame(index=models.keys, columns=['train_time', 'predict_time'])
+
+    for key in models:
+        time_df.loc[key, 'train_time'] = load_train(models[key], x_train, y_train, key, model_folder, model_prefix,
+                                                    load_saved=False)
+    models['fnp'].choose_r(x_train, y_train)  # set up reference set in case the model was loaded
+
+    pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, offset_test, scaler)
+    _, pred_ood_vars, _ = predict_transform_multiple(models, x_ood_rand, offset_test, scaler)
+    time_df.loc[:, 'predict_time'] = pred_times
+
+    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, y_test_orig, pred_ood_vars)
+
+    return pd.concat([time_df, scores_df], axis=1)
 
 
 def simple_aleo_nn_init(x_train, y_train):
+    hs = [24, 64, 32]
+    print(hs)
     es = EarlyStopping(patience=75)
     simple_nn = AleatoricNNSkorch(
         module=SimpleNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
-        module__hidden_size=[4, 77, 33],
+        module__hidden_size=hs,
         lr=0.0015,
         batch_size=1024,
-        max_epochs=200,
+        max_epochs=100,
         train_split=None,
         optimizer=torch.optim.Adam,
         criterion=HeteroscedasticLoss,
-        device=device,
-        verbose=1,
-        # callbacks=[es]
-    )
-
-    return simple_nn
-
-
-def simple_nn_init(x_train, y_train):
-    es = EarlyStopping(patience=75)
-    simple_nn = BaseNNSkorch(
-        module=SimpleNN,
-        module__input_size=x_train.shape[-1],
-        module__output_size=y_train.shape[-1],
-        module__hidden_size=[32, 48, 7],
-        lr=0.0015,
-        batch_size=1024,
-        max_epochs=200,
-        train_split=None,
-        optimizer=torch.optim.Adam,
-        criterion=torch.nn.MSELoss,
         device=device,
         verbose=1,
         # callbacks=[es]
@@ -177,11 +129,11 @@ def deep_gp_init(x_train, y_train):
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
         module__input_size=x_train.shape[-1],
-        module__hidden_size=[3],
+        module__hidden_size=[2],
         module__output_size=y_train.shape[-1] * 2,
         module__num_inducing=128,
-        lr=0.01,
-        max_epochs=4,
+        lr=0.001,
+        max_epochs=20,
         batch_size=1024,
         train_split=None,
         verbose=1,
@@ -259,14 +211,14 @@ def concrete_init(x_train, y_train):
         module=ConcreteDropoutNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
-        module__hidden_size=[16, 128, 128, 128],
+        module__hidden_size=[24, 64, 32],
         lengthscale=1e-4,
         dataset_size=x_train.shape[0],
         sample_count=30,
         lr=0.0015,
         train_split=None,
         verbose=1,
-        max_epochs=200,
+        max_epochs=108,
         batch_size=1024,
         optimizer=torch.optim.Adam,
         criterion=HeteroscedasticLoss,
