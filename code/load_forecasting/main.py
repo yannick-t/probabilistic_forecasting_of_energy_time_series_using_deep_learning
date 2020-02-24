@@ -76,7 +76,7 @@ def main():
         # load train time
         train_time_df = pd.read_csv(result_folder + prefix + 'train_time.csv', index_col=0)
         result_df.loc[:, 'train_time'] = train_time_df.loc[:, 'train_time']
-    result_df.to_csv(result_folder + prefix + 'results.csv')
+    result_df.to_csv(result_folder + prefix + 'results.csv', index_label='method')
 
 
 def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
@@ -105,6 +105,7 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
     for key in models:
         time_df.loc[key, 'train_time'] = load_train(models[key], x_train, y_train, key, model_folder, prefix,
                                                     load_saved=load_saved)
+        time_df.loc[key, 'train_time'] = time_df.loc[key, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
 
     if 'fnp' in models:
         models['fnp'].choose_r(x_train, y_train)  # set up reference set in case the model was loaded
@@ -112,6 +113,7 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
     pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, offset_test, scaler)
     _, pred_ood_vars, _ = predict_transform_multiple(models, x_ood_rand, offset_ood, scaler)
     time_df.loc[:, 'predict_time'] = pred_times
+    time_df.loc[:, 'predict_time'] = time_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
 
     scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, y_test_orig, pred_ood_vars, result_folder, prefix)
 
