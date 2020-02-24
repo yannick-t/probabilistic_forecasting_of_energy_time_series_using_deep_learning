@@ -42,11 +42,12 @@ def main():
     short_term = True
 
     # trained model location and prefix
-    model_folder = './trained_models/'
-    model_prefix = 'load_forecasting_'
+    model_folder = '../trained_models/'
+    prefix = 'load_forecasting_'
+    result_folder = '../results/'
 
     if short_term:
-        model_prefix = model_prefix + 'short_term_'
+        prefix = prefix + 'short_term_'
 
     # load / preprocess dataset if needed
     train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False, n_ahead=1)
@@ -62,42 +63,57 @@ def main():
     ood_df = gen_synth_ood_data_like(test_df, short_term=short_term)
     x_ood, _, offset_ood = dataset_df_to_np(ood_df)
 
-    init_train_eval_single(simple_aleo_nn_init, x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
-                           model_prefix, 'simple_nn_aleo')
+    # initialize and evaluate all methods, train and save if load_saved_models is false
+    load_saved_models = True
+    result_df = init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
+                        prefix, result_folder, load_saved=load_saved_models)
+
+    # save result csv
+    if not load_saved_models:
+        # save train time
+        result_df[['train_time']].to_csv(result_folder + prefix + 'train_time.csv')
+    else:
+        # load train time
+        train_time_df = pd.read_csv(result_folder + prefix + 'train_time.csv', index_col=0)
+        result_df.loc[:, 'train_time'] = train_time_df.loc[:, 'train_time']
+    result_df.to_csv(result_folder + prefix + 'results.csv')
 
 
 def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
                            model_prefix, name):
     model = init_fn(x_train, y_train)
-    load_train(model, x_train, y_train, name, model_folder, model_prefix, load_saved=False)
+    load_train(model, x_train, y_train, name, model_folder, model_prefix, load_saved=True)
     pred_mean, pred_var, _ = predict_transform(model, x_test, scaler, offset_test, name)
     _, pred_ood_var, _ = predict_transform(model, x_ood, scaler, offset_ood, name)
 
     evaluate_single(pred_mean, pred_var, y_test_orig, pred_ood_var)
 
 
-def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood_rand, scaler, model_folder, model_prefix):
+def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood_rand, offset_ood, scaler, model_folder,
+                        prefix, result_folder, load_saved=False):
     models = {}
 
     models['simple_nn_aleo'] = simple_aleo_nn_init(x_train, y_train)
     models['concrete'] = concrete_init(x_train, y_train)
-    models['fnp'] = fnp_init(x_train, y_train)
-    models['deep_ens'] = deep_ensemble_init(x_train, y_train)
-    models['bnn'] = bnn_init(x_train, y_train)
-    models['dgp'] = deep_gp_init(x_train, y_train)
+    # models['fnp'] = fnp_init(x_train, y_train)
+    # models['deep_ens'] = deep_ensemble_init(x_train, y_train)
+    # models['bnn'] = bnn_init(x_train, y_train)
+    # models['dgp'] = deep_gp_init(x_train, y_train)
 
-    time_df = pd.DataFrame(index=models.keys, columns=['train_time', 'predict_time'])
+    time_df = pd.DataFrame(index=models.keys(), columns=['train_time', 'predict_time'])
 
     for key in models:
-        time_df.loc[key, 'train_time'] = load_train(models[key], x_train, y_train, key, model_folder, model_prefix,
-                                                    load_saved=False)
-    models['fnp'].choose_r(x_train, y_train)  # set up reference set in case the model was loaded
+        time_df.loc[key, 'train_time'] = load_train(models[key], x_train, y_train, key, model_folder, prefix,
+                                                    load_saved=load_saved)
+
+    if 'fnp' in models:
+        models['fnp'].choose_r(x_train, y_train)  # set up reference set in case the model was loaded
 
     pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, offset_test, scaler)
-    _, pred_ood_vars, _ = predict_transform_multiple(models, x_ood_rand, offset_test, scaler)
+    _, pred_ood_vars, _ = predict_transform_multiple(models, x_ood_rand, offset_ood, scaler)
     time_df.loc[:, 'predict_time'] = pred_times
 
-    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, y_test_orig, pred_ood_vars)
+    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, y_test_orig, pred_ood_vars, result_folder, prefix)
 
     return pd.concat([time_df, scores_df], axis=1)
 

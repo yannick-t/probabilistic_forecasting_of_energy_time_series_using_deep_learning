@@ -11,21 +11,27 @@ names_pretty_dict = {'simple_nn_aleo': 'Simple NN', 'concrete': 'Concrete', 'fnp
                      'bnn': 'BNN', 'dgp': 'Deep GP'}
 
 
-def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars):
+def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars, result_folder, result_prefix):
     names_pretty = [names_pretty_dict[name] for name in names]
 
     # calibration
     probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
+    plt.savefig(result_folder + result_prefix + 'calibration_probabilistic.pdf')
     marginal_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
+    plt.savefig(result_folder + result_prefix + 'calibration_marginal.pdf')
 
     # sharpness
     sharpness_plot_multiple(names_pretty, pred_vars)
+    plt.savefig(result_folder + result_prefix + 'calibration_sharpness.pdf')
 
     # epistemic out of distribution evaluation
     sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, pred_ood_vars)
+    plt.savefig(result_folder + result_prefix + 'sharpness_ood.pdf')
+
+    plt.show()
 
     scores = pd.DataFrame(index=names, columns=['90IntCov', '50IntCov', 'AvgCent50W', 'AvgCent90W', 'RMSE', 'MAPE',
-                                                'CRPS', 'AVGLL'])
+                                                'CRPS', 'AVGNLL'])
 
     # scoring etc.
     for name, pmean, pvar in zip(names, pred_means, pred_vars):
@@ -45,15 +51,15 @@ def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars):
         scores.loc[name, 'AvgCent50W'] = avg_5
         scores.loc[name, 'AvgCent90W'] = avg_9
 
-        scores.loc[name, 'RMSE'] = rmse(pmean, true_y)
-        scores.loc[name, 'MAPE'] = mape(pmean, true_y)
-        scores.loc[name, 'CRPS'] = crps(pmean, np.sqrt(pvar), true_y)
-        scores.loc[name, 'AVGLL'] = log_likelihood(pmean, np.sqrt(pvar), true_y)
+        scores.loc[name, 'RMSE'] = rmse(pmean, true_y).squeeze()
+        scores.loc[name, 'MAPE'] = mape(pmean, true_y).squeeze()
+        scores.loc[name, 'CRPS'] = crps(pmean, np.sqrt(pvar), true_y).squeeze()
+        scores.loc[name, 'AVGNLL'] = -log_likelihood(pmean, np.sqrt(pvar), true_y).squeeze()
 
         print("RMSE: %.4f" % scores.loc[name, 'RMSE'])
         print("MAPE: %.2f" % scores.loc[name, 'MAPE'])
         print("CRPS: %.4f" % scores.loc[name, 'CRPS'])
-        print("Average LL: %.4f" % scores.loc[name, 'AVGLL'])
+        print("Average Negative LL: %.4f" % scores.loc[name, 'AVGNLL'])
 
     return scores
 

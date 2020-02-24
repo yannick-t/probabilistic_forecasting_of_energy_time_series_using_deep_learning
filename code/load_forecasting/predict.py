@@ -11,7 +11,7 @@ def predict_transform_multiple(models, x_test, offset_test, scaler):
     pred_vars = []
     times = []
     for name in models:
-        pmean, pvar, time = predict_transform(models[name], x_test, offset_test, scaler, name)
+        pmean, pvar, time = predict_transform(models[name], x_test, scaler, offset_test, name)
         pred_means.append(pmean)
         pred_vars.append(pvar)
         times.append(time)

@@ -13,7 +13,6 @@ def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
         probabilistic_calibration(pmean, pvar, y_true, ax)
     fig.text(0.016, 0.5, 'Relative Frequency', va='center', rotation='vertical')
     plt.subplots_adjust(left=0.1)
-    plt.show()
 
 
 def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
@@ -26,7 +25,6 @@ def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
         marginal_calibration(pmean, pvar, y_true, ax)
     fig.text(0.014, 0.5, 'CDF Difference', va='center', rotation='vertical')
     plt.subplots_adjust(left=0.11)
-    plt.show()
 
 
 def probabilistic_calibration(pred_y_mean, pred_y_var, y_true, ax):
