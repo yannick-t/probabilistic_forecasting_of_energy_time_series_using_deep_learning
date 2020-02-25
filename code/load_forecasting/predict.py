@@ -2,6 +2,7 @@ import time
 import numpy as np
 import pandas as pd
 from datetime import timedelta
+import statsmodels.api as sm
 
 from util.data.data_tools import inverse_transform_normal
 
@@ -21,17 +22,29 @@ def predict_transform_multiple(models, x_test, offset_test, scaler):
 
 def predict_transform(model, x_test, scaler, offset_test, model_name=''):
     # predict and inverse transform
-    start = time.time_ns()
-    pred_y = model.predict(x_test)
-    end = time.time_ns()
-    print('predict time ' + model_name + ' %d ns' % (end - start))
+    if model_name == 'linear_reg':
+        start = time.time_ns()
+        pred = model.get_prediction(sm.add_constant(x_test))
+        end = time.time_ns()
 
-    pred_y_mean = pred_y[..., 0]
-    pred_y_var = pred_y[..., 1]
+        pred_y_mean = pred.predicted_mean
+        pred_y_var = pred.var_pred_mean
+        if len(pred_y_mean.shape) == 1:
+            pred_y_mean = pred_y_mean.reshape(-1, 1)
+            pred_y_var = pred_y_var.reshape(-1, 1)
+    else:
+        start = time.time_ns()
+        pred_y = model.predict(x_test)
+        end = time.time_ns()
+
+        pred_y_mean = pred_y[..., 0]
+        pred_y_var = pred_y[..., 1]
 
     pred_y_mean, pred_y_std = inverse_transform_normal(pred_y_mean, np.sqrt(pred_y_var), scaler)
     pred_y_var = pred_y_std ** 2
     pred_y_mean = pred_y_mean + offset_test
+
+    print('predict time ' + model_name + ' %d ns' % (end - start))
 
     return pred_y_mean, pred_y_var, (end - start)
 

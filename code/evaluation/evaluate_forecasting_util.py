@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 names_pretty_dict = {'simple_nn_aleo': 'Simple NN', 'concrete': 'Concrete', 'fnp': 'FNP', 'deep_ens': 'Deep Ens.',
-                     'bnn': 'BNN', 'dgp': 'Deep GP'}
+                     'bnn': 'BNN', 'dgp': 'Deep GP', 'linear_reg': 'Linear Regression'}
 
 
 def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars, result_folder, result_prefix):

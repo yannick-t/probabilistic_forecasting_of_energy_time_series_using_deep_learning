@@ -7,6 +7,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from skorch.callbacks import EarlyStopping
 import pandas as pd
+import statsmodels.api as sm
 
 from evaluation.evaluate_forecasting_util import plot_test_data, evaluate_multiple, evaluate_multi_step, evaluate_single
 from evaluation.scoring import rmse, mape, crps, log_likelihood
@@ -64,9 +65,9 @@ def main():
     x_ood, _, offset_ood = dataset_df_to_np(ood_df)
 
     # initialize and evaluate all methods, train and save if load_saved_models is false
-    load_saved_models = True
+    load_saved_models = False
     result_df = init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
-                        prefix, result_folder, load_saved=load_saved_models)
+                        prefix, result_folder, short_term, load_saved=load_saved_models)
 
     # save result csv
     if not load_saved_models:
@@ -80,8 +81,8 @@ def main():
 
 
 def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
-                           model_prefix, name):
-    model = init_fn(x_train, y_train)
+                           model_prefix, name, short_term):
+    model = init_fn(x_train, y_train, short_term)
     load_train(model, x_train, y_train, name, model_folder, model_prefix, load_saved=True)
     pred_mean, pred_var, _ = predict_transform(model, x_test, scaler, offset_test, name)
     _, pred_ood_var, _ = predict_transform(model, x_ood, scaler, offset_ood, name)
@@ -90,22 +91,29 @@ def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_tes
 
 
 def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood_rand, offset_ood, scaler, model_folder,
-                        prefix, result_folder, load_saved=False):
+                        prefix, result_folder, short_term, load_saved=False):
     models = {}
 
-    models['simple_nn_aleo'] = simple_aleo_nn_init(x_train, y_train)
-    models['concrete'] = concrete_init(x_train, y_train)
-    # models['fnp'] = fnp_init(x_train, y_train)
-    # models['deep_ens'] = deep_ensemble_init(x_train, y_train)
-    # models['bnn'] = bnn_init(x_train, y_train)
-    # models['dgp'] = deep_gp_init(x_train, y_train)
+    models['linear_reg'] = linear_regression_init(x_train, y_train, short_term)
+    # models['simple_nn_aleo'] = simple_aleo_nn_init(x_train, y_train, short_term)
+    # models['concrete'] = concrete_init(x_train, y_train, short_term)
+    # models['fnp'] = fnp_init(x_train, y_train, short_term)
+    # models['deep_ens'] = deep_ensemble_init(x_train, y_train, short_term)
+    models['bnn'] = bnn_init(x_train, y_train, short_term)
+    # models['dgp'] = deep_gp_init(x_train, y_train, short_term)
 
     time_df = pd.DataFrame(index=models.keys(), columns=['train_time', 'predict_time'])
 
     for key in models:
-        time_df.loc[key, 'train_time'] = load_train(models[key], x_train, y_train, key, model_folder, prefix,
-                                                    load_saved=load_saved)
-        time_df.loc[key, 'train_time'] = time_df.loc[key, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
+        if key == 'linear_reg':
+            # not a skorch model, separate training
+            start = time.time_ns()
+            models[key] = models[key].fit()
+            end = time.time_ns()
+            time_df.loc[key, 'train_time'] = end - start
+        else:
+            time_df.loc[key, 'train_time'] = load_train(models[key], x_train, y_train, key, model_folder, prefix,
+                                                        load_saved=load_saved)
 
     if 'fnp' in models:
         models['fnp'].choose_r(x_train, y_train)  # set up reference set in case the model was loaded
@@ -113,6 +121,9 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
     pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, offset_test, scaler)
     _, pred_ood_vars, _ = predict_transform_multiple(models, x_ood_rand, offset_ood, scaler)
     time_df.loc[:, 'predict_time'] = pred_times
+
+    # convert times
+    time_df.loc[:, 'train_time'] = time_df.loc[key, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
     time_df.loc[:, 'predict_time'] = time_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
 
     scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, y_test_orig, pred_ood_vars, result_folder, prefix)
@@ -120,9 +131,20 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
     return pd.concat([time_df, scores_df], axis=1)
 
 
-def simple_aleo_nn_init(x_train, y_train):
-    hs = [24, 64, 32]
-    print(hs)
+def linear_regression_init(x_train, y_train, short_term):
+    # statsmodels linear regression as reference
+    # different to other models because not scikit learn / skorch
+    x_train_lr = sm.add_constant(x_train)
+    linear_reg = sm.OLS(y_train, x_train_lr)
+
+    return linear_reg
+
+
+def simple_aleo_nn_init(x_train, y_train, short_term):
+    if short_term:
+        hs = [24, 64, 32]
+    else:
+        hs = [132, 77, 50]
     es = EarlyStopping(patience=75)
     simple_nn = AleatoricNNSkorch(
         module=SimpleNN,
@@ -143,7 +165,7 @@ def simple_aleo_nn_init(x_train, y_train):
     return simple_nn
 
 
-def deep_gp_init(x_train, y_train):
+def deep_gp_init(x_train, y_train, short_term):
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
         module__input_size=x_train.shape[-1],
@@ -162,17 +184,27 @@ def deep_gp_init(x_train, y_train):
     return dgp
 
 
-def bnn_init(x_train, y_train):
+def bnn_init(x_train, y_train, short_term):
+    # paramters found through hyperparameter optimization
+    if short_term:
+        hs = [24, 64, 32]
+        prior_mu = -2.4
+        prior_sigma = 0.1
+    else:
+        hs = [132, 77, 50]
+        prior_mu = -5
+        prior_sigma = 0.1
+
     bnn = BNNSkorch(
         module=TorchBNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
-        module__hidden_size=[32, 48, 7],
-        module__prior_mu=0,
-        module__prior_sigma=0.1,
+        module__hidden_size=hs,
+        module__prior_mu=prior_mu,
+        module__prior_sigma=prior_sigma,
         sample_count=30,
         lr=0.001,
-        max_epochs=4000,
+        max_epochs=100,
         train_split=None,
         verbose=1,
         batch_size=1024,
@@ -183,7 +215,7 @@ def bnn_init(x_train, y_train):
     return bnn
 
 
-def fnp_init(x_train, y_train):
+def fnp_init(x_train, y_train, short_term):
     fnp = RegressionFNPSkorch(
         module=RegressionFNP,
         module__dim_x=x_train.shape[-1],
@@ -208,11 +240,17 @@ def fnp_init(x_train, y_train):
     return fnp
 
 
-def deep_ensemble_init(x_train, y_train):
+def deep_ensemble_init(x_train, y_train, short_term):
+    # paramters found through hyperparameter optimization
+    if short_term:
+        hs = [24, 64, 32]
+    else:
+        hs = [132, 77, 50]
+
     ensemble_model = DeepEnsemble(
         input_size=x_train.shape[-1],
         output_size=y_train.shape[-1] * 2,
-        hidden_size=[32, 48, 7],
+        hidden_size=hs,
         lr=0.001,
         max_epochs=3000,
         batch_size=1024,
@@ -224,12 +262,18 @@ def deep_ensemble_init(x_train, y_train):
     return ensemble_model
 
 
-def concrete_init(x_train, y_train):
+def concrete_init(x_train, y_train, short_term):
+    # paramters found through hyperparameter optimization
+    if short_term:
+        hs = [24, 64, 32]
+    else:
+        hs = [132, 77, 50]
+
     concrete_model = ConcreteSkorch(
         module=ConcreteDropoutNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
-        module__hidden_size=[24, 64, 32],
+        module__hidden_size=hs,
         lengthscale=1e-4,
         dataset_size=x_train.shape[0],
         sample_count=30,
