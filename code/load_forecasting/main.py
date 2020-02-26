@@ -96,17 +96,17 @@ def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_tes
 
 
 def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood_rand, offset_ood, scaler, model_folder,
-                        prefix, result_folder, short_term, load_saved=False):
+                        prefix, result_folder, short_term, load_saved=False, recalibrate=False):
     models = {}
 
-    models['linear_reg'] = linear_regression_init(x_train, y_train, short_term)
-    models['quantile_reg'] = quantile_regression_init(x_train, y_train, short_term)
+    # models['linear_reg'] = linear_regression_init(x_train, y_train, short_term)
+    # models['quantile_reg'] = quantile_regression_init(x_train, y_train, short_term)
     # models['gp'] = simple_gp_init(x_train, y_train, short_term)
     models['simple_nn_aleo'] = simple_aleo_nn_init(x_train, y_train, short_term)
     # models['concrete'] = concrete_init(x_train, y_train, short_term)
     # models['fnp'] = fnp_init(x_train, y_train, short_term)
     # models['deep_ens'] = deep_ensemble_init(x_train, y_train, short_term)
-    models['bnn'] = bnn_init(x_train, y_train, short_term)
+    # models['bnn'] = bnn_init(x_train, y_train, short_term)
     # models['dgp'] = deep_gp_init(x_train, y_train, short_term)
 
     time_df = pd.DataFrame(index=models.keys(), columns=['train_time', 'predict_time'])

@@ -1,4 +1,7 @@
 import time
+import statsmodels.api as sm
+
+from load_forecasting.predict import predict
 
 
 def load_train(model, x_train, y_train, model_name, model_folder, model_prefix, load_saved):
@@ -17,3 +20,4 @@ def load_train(model, x_train, y_train, model_name, model_folder, model_prefix, 
         model.save_params(model_file)
 
         return end - start
+
