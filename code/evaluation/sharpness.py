@@ -1,17 +1,17 @@
 from matplotlib import pyplot as plt
+import seaborn as sns
 from scipy.special import erfinv
 import numpy as np
+import pandas as pd
 
 
 def sharpness_plot_multiple(names, pred_y_var):
     fig, ax = plt.subplots(figsize=(6, 3.0))
-    plt.subplots_adjust(bottom=0.27, left=0.05, top=0.93)
-    # ax.set_ylabel('Width')
+    plt.subplots_adjust(bottom=0.16, left=0.1, top=0.93)
+    ax.set_ylabel('Width')
 
     sharpness_plot_(pred_y_var, ax, names)
     # plt.subplots_adjust(left=0.1)
-
-    plt.show()
 
 
 def sharpness_plot(pred_y_var, ax, scaler=None):
@@ -26,16 +26,17 @@ def sharpness_plot_histogram(pred_y_var, ax):
 
 
 def sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
-    n_bins = 25
-    ax.hist(np.sqrt(pred_test_var), n_bins, histtype='stepfilled', color='lightblue', )
-    ax.hist(np.sqrt(pred_ood_var), n_bins, histtype='step', color='orange')
+    sns.kdeplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', cut=0)
+    sns.rugplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', height=0.025)
+    sns.kdeplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue', shade=True, cut=0)
+    sns.rugplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue')
     ax.set_yticklabels([])
     ax.margins(0, 0.06)
 
 
 def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars):
     count = len(names)
-    fig, axes = plt.subplots(1, count, sharey='row', figsize=(6, 1.8))
+    fig, axes = plt.subplots(1, count, figsize=(6, 1.8))
 
     for counter, (name, p_test_var, p_ood_var) in enumerate(zip(names, pred_test_vars, pred_ood_vars)):
         ax = axes[counter]
@@ -43,39 +44,38 @@ def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars
 
         sharpness_plot_histogram_joint(p_test_var, p_ood_var, ax)
 
-    plt.show()
-
 
 def sharpness_plot_(pred_y_var, ax, names=None, scaler=None):
-    q_5 = np.sqrt(2) * erfinv(0.5)
-    q_9 = np.sqrt(2) * erfinv(0.9)
+    quantiles = [0.5, 0.9]
 
     pred_y_var = np.array(pred_y_var)
 
-    widths_5_list = np.empty([pred_y_var.shape[0], pred_y_var.shape[1]])
-    widths_9_list = np.empty([pred_y_var.shape[0], pred_y_var.shape[1]])
+    columns = ['Method', 'Quantile', 'Width']
+    widths = pd.DataFrame(columns=columns)
 
     for counter, pred_var in enumerate(pred_y_var):
 
         pred_std = np.sqrt(pred_var)
+        for q_counter, q in enumerate(quantiles):
+            if names is not None:
+                name = names[counter]
+            else:
+                name = ''
 
-        widths_5 = q_5 * pred_std
-        widths_9 = q_9 * pred_std
+            quantile_widths = np.sqrt(2) * erfinv(q) * pred_std
+            n_widths_df = pd.DataFrame(columns=columns, index=range(quantile_widths.shape[0]))
 
-        widths_5_list[counter] = widths_5.squeeze()
-        widths_9_list[counter] = widths_9.squeeze()
+            n_widths_df.loc[:, 'Method'] = np.repeat(name, quantile_widths.shape[0])
+            n_widths_df.loc[:, 'Quantile'] = np.repeat(q, quantile_widths.shape[0])
+            n_widths_df.loc[:, 'Width'] = quantile_widths.squeeze()
 
-    widths = np.concatenate([widths_5_list, widths_9_list])
+            widths = pd.concat([widths, n_widths_df], axis=0)
 
     # display 5, 25, 50, 75, 95 percentile / quantile as boxplot to assess sharpness in a heteroscedastic scenario
     # (like in
     # "Gneiting, T., Balabdaoui, F., & Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness.
     # Journal of the Royal Statistical Society: Series B (Statistical Methodology), 69(2), 243-268.")
-    ax.boxplot([q for q in widths], showfliers=False, whis=[5, 95])
-    if names is not None:
-        ax.set_xticklabels(np.concatenate([[name + ' 50%' for name in names], [name + ' 90%' for name in names]]), rotation=45)
-    else:
-        ax.set_xticklabels(['50%', '90%'])
+    sns.boxplot(x='Quantile', y='Width', hue='Method', data=widths, whis=[5, 95], ax=ax, showfliers=False)
 
 
 def sharpness_avg_width(pred_var):

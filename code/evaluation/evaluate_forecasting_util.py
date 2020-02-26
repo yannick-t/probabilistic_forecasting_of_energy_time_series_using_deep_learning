@@ -2,21 +2,36 @@ from evaluation.calibration import probabilistic_calibration_multiple, marginal_
     probabilistic_calibration, marginal_calibration
 from evaluation.scoring import rmse, mape, crps, log_likelihood
 from evaluation.sharpness import sharpness_plot_multiple, sharpness_plot_histogram_joint_multiple, sharpness_avg_width, \
-    sharpness_plot, sharpness_plot_histogram
+    sharpness_plot, sharpness_plot_histogram, sharpness_plot_histogram_joint
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+
+names_pretty_dict = {'simple_nn_aleo': 'Simple NN', 'concrete': 'Concrete', 'fnp': 'FNP', 'deep_ens': 'Deep Ens.',
+                     'bnn': 'BNN', 'dgp': 'Deep GP', 'linear_reg': 'Linear Regression'}
 
 
-def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars):
+def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars, result_folder, result_prefix):
+    names_pretty = [names_pretty_dict[name] for name in names]
+
     # calibration
-    probabilistic_calibration_multiple(names, pred_means, pred_vars, true_y)
-    marginal_calibration_multiple(names, pred_means, pred_vars, true_y)
+    probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
+    plt.savefig(result_folder + result_prefix + 'calibration_probabilistic.pdf')
+    marginal_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
+    plt.savefig(result_folder + result_prefix + 'calibration_marginal.pdf')
 
     # sharpness
-    sharpness_plot_multiple(names, pred_vars)
+    sharpness_plot_multiple(names_pretty, pred_vars)
+    plt.savefig(result_folder + result_prefix + 'calibration_sharpness.pdf')
 
     # epistemic out of distribution evaluation
-    sharpness_plot_histogram_joint_multiple(names, pred_vars, pred_ood_vars)
+    sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, pred_ood_vars)
+    plt.savefig(result_folder + result_prefix + 'sharpness_ood.pdf')
+
+    plt.show()
+
+    scores = pd.DataFrame(index=names, columns=['90IntCov', '50IntCov', 'AvgCent50W', 'AvgCent90W', 'RMSE', 'MAPE',
+                                                'CRPS', 'AVGNLL'])
 
     # scoring etc.
     for name, pmean, pvar in zip(names, pred_means, pred_vars):
@@ -24,21 +39,32 @@ def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars):
         print('Model: ' + name)
         cov = interval_coverage(pmean, pvar, true_y, 0.9)
         print('0.9 interval coverage: %.5f' % cov)
+        scores.loc[name, '90IntCov'] = cov
 
         cov = interval_coverage(pmean, pvar, true_y, 0.5)
         print('0.5 interval coverage: %.5f' % cov)
+        scores.loc[name, '50IntCov'] = cov
 
         avg_5, avg_9 = sharpness_avg_width(pvar)
         print('Average central 50%% interval width: %.5f' % avg_5)
         print('Average central 90%% interval width: %.5f' % avg_9)
+        scores.loc[name, 'AvgCent50W'] = avg_5
+        scores.loc[name, 'AvgCent90W'] = avg_9
 
-        print("RMSE: %.4f" % rmse(pmean, true_y))
-        print("MAPE: %.2f" % mape(pmean, true_y))
-        print("CRPS: %.4f" % crps(pmean, np.sqrt(pvar), true_y))
-        print("Average LL: %.4f" % log_likelihood(pmean, np.sqrt(pvar), true_y))
+        scores.loc[name, 'RMSE'] = rmse(pmean, true_y).squeeze()
+        scores.loc[name, 'MAPE'] = mape(pmean, true_y).squeeze()
+        scores.loc[name, 'CRPS'] = crps(pmean, np.sqrt(pvar), true_y).squeeze()
+        scores.loc[name, 'AVGNLL'] = -log_likelihood(pmean, np.sqrt(pvar), true_y).squeeze()
+
+        print("RMSE: %.4f" % scores.loc[name, 'RMSE'])
+        print("MAPE: %.2f" % scores.loc[name, 'MAPE'])
+        print("CRPS: %.4f" % scores.loc[name, 'CRPS'])
+        print("Average Negative LL: %.4f" % scores.loc[name, 'AVGNLL'])
+
+    return scores
 
 
-def evaluate_single(pred_mean, pred_var, true_y):
+def evaluate_single(pred_mean, pred_var, true_y, pred_ood_var):
     # calibration
     ax = plt.subplot(2, 2, 1)
     ax.set_title('Probabilistic Calibration: Probability Integral Transform Histogram')
@@ -60,7 +86,7 @@ def evaluate_single(pred_mean, pred_var, true_y):
     sharpness_plot(pred_var, ax)
     ax = plt.subplot(2, 2, 4)
     ax.set_title('Sharpness: Predictive Interval Width Histogram')
-    sharpness_plot_histogram(pred_var, ax)
+    sharpness_plot_histogram_joint(pred_var, pred_ood_var, ax)
     avg_5, avg_9 = sharpness_avg_width(pred_var)
     print('Average central 50%% interval width: %.5f' % avg_5)
     print('Average central 90%% interval width: %.5f' % avg_9)

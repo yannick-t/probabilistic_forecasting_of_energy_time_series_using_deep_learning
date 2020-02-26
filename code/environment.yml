@@ -3,6 +3,7 @@ channels:
   - pytorch
   - conda-forge
   - defaults
+  - anaconda
 dependencies:
   - cudatoolkit=10.1.243
   - matplotlib=3.1.2
@@ -16,6 +17,7 @@ dependencies:
   - skorch=0.7.0
   - torchvision=0.5.0
   - statsmodels=0.11.0
+  - seaborn=0.10.0
   - pip:
     - gpytorch==1.0.1
     - workalendar==8.0.2

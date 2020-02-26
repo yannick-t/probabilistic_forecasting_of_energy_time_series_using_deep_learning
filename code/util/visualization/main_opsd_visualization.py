@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import pandas
+import seaborn as sns
 
 from util.data.data_src_tools import load_opsd_de_load_transparency
 
@@ -8,8 +8,10 @@ def main():
     fig = plt.figure()
 
     dataset = load_opsd_de_load_transparency()
-
     load = dataset['load']
+    sns.kdeplot(load)
+    plt.show()
+
     load = load.resample('4D')
     load = load.mean()
     load = load.dropna()

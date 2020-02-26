@@ -5,6 +5,7 @@ from torch.distributions import Normal
 
 
 def rmse(y_pred, y_true):
+    assert y_pred.shape == y_true.shape
     return np.sqrt(np.mean((y_pred - y_true) ** 2, axis=0))
 
 
@@ -13,6 +14,8 @@ def crps(mu, sigma, y):
     # Calibrated probabilistic forecasting using ensemble model output statistics and minimum CRPS estimation.
     # Monthly Weather Review, 133(5), 1098-1118.
     # Formula 5
+
+    assert mu.shape == y.shape
 
     sx = (y - mu) / sigma
 
@@ -35,10 +38,12 @@ def crps(mu, sigma, y):
 
 
 def mape(y_pred, y_true):
+    assert y_pred.shape == y_true.shape
     return 100 * np.mean(np.abs((y_true - y_pred) / y_true), axis=0)
 
 
 def log_likelihood(mu, sigma, y):
+    assert mu.shape == y.shape
     mu = torch.Tensor(mu).cpu()
     sigma = torch.Tensor(sigma).cpu()
     y = torch.Tensor(y).cpu()
