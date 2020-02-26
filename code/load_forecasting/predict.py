@@ -29,6 +29,23 @@ def predict_transform(model, x_test, scaler, offset_test, model_name=''):
 
         pred_y_mean = pred.predicted_mean
         pred_y_var = pred.var_pred_mean
+
+        if len(pred_y_mean.shape) == 1:
+            pred_y_mean = pred_y_mean.reshape(-1, 1)
+            pred_y_var = pred_y_var.reshape(-1, 1)
+    elif model_name == 'quantile_reg':
+        start = time.time_ns()
+        preds = [m.get_prediction(sm.add_constant(x_test)) for m in model]
+        end = time.time_ns()
+
+        pred_means = np.array([pred.predicted_mean for pred in preds])
+        pred_means_var = np.array([pred.var_pred_mean for pred in preds])
+        pred_y_mean = np.mean(pred_means, axis=0)
+
+        # pred_y_var = ((pred_means[2] - pred_means[0]) / 1.35) ** 2
+
+        pred_y_var = np.mean((pred_means ** 2), axis=0) - pred_y_mean ** 2 + np.mean((pred_means_var ** 2), axis=0)
+
         if len(pred_y_mean.shape) == 1:
             pred_y_mean = pred_y_mean.reshape(-1, 1)
             pred_y_var = pred_y_var.reshape(-1, 1)
