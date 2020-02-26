@@ -27,7 +27,10 @@ def crps(mu, sigma, y):
 
     crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - (1 / np.sqrt(np.pi)))
 
-    assert not np.any(np.isnan(crps))
+    if np.any(np.isnan(crps)):
+        # bad
+        print('nan encountered in crps')
+        return 100
 
     crps = np.mean(crps, axis=0)
 
