@@ -30,7 +30,7 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    short_term = True
+    short_term = False
     train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False)
 
     x_train, y_train, offset_train = dataset_df_to_np(train_df)
@@ -40,7 +40,7 @@ def main():
     print('OPSD ENTSOE-E Transparency')
     print('short term: %r' % short_term)
 
-    simple_nn_aleo_bo(x_train, y_train, x_test, y_test)
+    bnn_bo(x_train, y_train, x_test, y_test, short_term)
 
 
 def deep_gp_bo(x_train, y_train, x_test, y_test):
@@ -50,8 +50,8 @@ def deep_gp_bo(x_train, y_train, x_test, y_test):
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
         module__num_inducing=128,
-        max_epochs=1000,
-        batch_size=256,
+        max_epochs=40,
+        batch_size=1024,
         train_split=None,
         optimizer=torch.optim.Adam,
         num_data=x_train.shape[0],
@@ -59,51 +59,68 @@ def deep_gp_bo(x_train, y_train, x_test, y_test):
 
     space = {# 'lr': Real(0.001, 0.03, 'log-uniform'),
              'module__hidden_size_0': Integer(1, 4),
-             'module__hidden_size_1': Integer(1, 8),
-             'module__hidden_size_2': Integer(1, 4),
+             # 'module__hidden_size_1': Integer(1, 8),
+             # 'module__hidden_size_2': Integer(1, 4),
              # 'module__num_inducing': Integer(16, 512),
              }
 
-    bayesian_optimization(dgp, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=256,
-                          n_jobs=1)  # workaround for pickling error of gpytorch stuff, can't run prallel
+    bayesian_optimization(dgp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=4,
+                          n_jobs=1, cv=3)  # workaround for pickling error of gpytorch stuff, can't run prallel
 
 
-def bnn_bo(x_train, y_train, x_test, y_test):
+def bnn_bo(x_train, y_train, x_test, y_test, short_term):
     print('Bayesian Neural Network')
+    if short_term:
+        hs = [24, 64, 32]
+        prior_mu = 0
+        prior_sigma = 0.1
+    else:
+        hs = [132, 77, 50]
+        prior_mu = 0
+        prior_sigma = 0.1
+    print(hs)
     bnn = BNNSkorch(
         module=TorchBNN,
         module__input_size=x_train.shape[-1],
+        module__hidden_size=hs,
         module__output_size=y_train.shape[-1] * 2,
-        module__prior_mu=0,
-        module__prior_sigma=0.1,
+        module__prior_mu=prior_mu,
+        module__prior_sigma=prior_sigma,
         sample_count=30,
         train_split=None,
-        max_epochs=5000,
+        max_epochs=10,
         batch_size=1024,
+        lr=0.001,
         optimizer=torch.optim.Adam,
         criterion=HeteroscedasticLoss,
         device=device,
         verbose=0
     )
 
-    space = {'lr': Real(0.001, 0.03, 'log-uniform'),
-             'module__hidden_size_0': Integer(16, 256),
-             'module__hidden_size_1': Integer(16, 512),
-             'module__hidden_size_2': Integer(1, 256),
-             'module__hidden_size_3': Integer(1, 256),
-             'module__prior_mu': Real(-10, 10),
-             'module__prior_sigma': Real(0.001, 0.15),
-             # 'module__hidden_size_4': Integer(1, 1024),
-             # 'module__hidden_size_5': Integer(1, 1024),
+    space = {
+        'lr': Real(0.00005, 0.005, 'log-uniform'),
+        'max_epochs': Integer(350, 4200),
+        # 'module__hidden_size_0': Integer(16, 256),
+        # 'module__hidden_size_1': Integer(16, 512),
+        # 'module__hidden_size_2': Integer(1, 256),
+        # 'module__hidden_size_3': Integer(1, 256),
+        # 'module__prior_mu': Real(-8, 6),
+        # 'module__prior_sigma': Real(0.001, 0.11),
              }
 
-    bayesian_optimization(bnn, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=512)
+    bayesian_optimization(bnn, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=28, cv=3)
 
 
-def deep_ens_bo(x_train, y_train, x_test, y_test):
+def deep_ens_bo(x_train, y_train, x_test, y_test, short_term):
     print('Deep Ensemble')
+    if short_term:
+        hs = [24, 64, 32]
+    else:
+        hs = [132, 77, 50]
+    print(hs)
     deep_ens = DeepEnsemble(
         input_size=x_train.shape[-1],
+        hidden_size=hs,
         output_size=y_train.shape[-1] * 2,
         lr=0.0015,
         max_epochs=30,
@@ -116,25 +133,37 @@ def deep_ens_bo(x_train, y_train, x_test, y_test):
     )
 
     space = {
+        'lr': Real(0.00005, 0.005, 'log-uniform'),
+        'max_epochs': Integer(350, 3500),
         # 'lr': Real(0.01, 0.1, 'log-uniform'),
-        'module__hidden_size_0': Integer(1, 256),
-        'module__hidden_size_1': Integer(1, 256),
-        'module__hidden_size_2': Integer(1, 256),
-        'module__hidden_size_3': Integer(1, 256),
+        # 'module__hidden_size_0': Integer(1, 256),
+        # 'module__hidden_size_1': Integer(1, 256),
+        # 'module__hidden_size_2': Integer(1, 256),
+        # 'module__hidden_size_3': Integer(1, 256),
         # 'hidden_size_4': Integer(1, 1024),
         # 'hidden_size_5': Integer(1, 1024),
     }
 
-    bayesian_optimization(deep_ens, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=10)
+    bayesian_optimization(deep_ens, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=28)
 
 
-def fnp_bo(x_train, y_train, x_test, y_test):
-    cv = 4
+def fnp_bo(x_train, y_train, x_test, y_test, short_term):
+    cv = 3
+    if short_term:
+        hs_enc = [24, 64]
+        hs_dec = [32]
+    else:
+        hs_enc = [132, 77]
+        hs_dec = [50]
+    print(hs_enc)
+    print(hs_dec)
     print('Functional Neural Processes')
     fnp = RegressionFNPSkorch(
         module=RegressionFNP,
         module__dim_x=x_train.shape[-1],
         module__dim_y=y_train.shape[-1],
+        module__hidden_size_enc=hs_enc,
+        module__hidden_size_dec=hs_dec,
         train_split=None,
         optimizer=torch.optim.Adam,
         device=device,
@@ -142,9 +171,9 @@ def fnp_bo(x_train, y_train, x_test, y_test):
         verbose=0,
         module__dim_u=3,
         module__dim_z=50,
-        module__fb_z=1.0,
+        module__fb_z=2.0,
         lr=0.001,
-        reference_set_size_ratio=0.15,
+        reference_set_size_ratio=0.08,
         max_epochs=100,
         batch_size=128
     )
@@ -166,18 +195,25 @@ def fnp_bo(x_train, y_train, x_test, y_test):
     bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=200, cv=cv)
 
 
-def concrete_bo(x_train, y_train, x_test, y_test):
-    cv = 4
+def concrete_bo(x_train, y_train, x_test, y_test, short_term):
+    cv = 3
     print('Concrete Dropout')
+    # hs = [6, 10, 32]
+    # hs = [128, 16, 56]
+    if short_term:
+        hs = [24, 64, 32]
+    else:
+        hs = [132, 77, 50]
+    print(hs)
     concrete = ConcreteSkorch(module=ConcreteDropoutNN,
                               module__input_size=x_train.shape[-1],
+                              module__hidden_size=hs,
                               module__output_size=y_train.shape[-1] * 2,
-                              lengthscale=1e-4,
+                              lengthscale=1e-6,
                               dataset_size=int((1 - 1 / cv) * x_train.shape[0]),
                               sample_count=30,
-                              lr=0.001,
                               train_split=None,
-                              max_epochs=108,
+                              max_epochs=1000,
                               batch_size=1024,
                               optimizer=torch.optim.Adam,
                               criterion=HeteroscedasticLoss,
@@ -185,14 +221,14 @@ def concrete_bo(x_train, y_train, x_test, y_test):
                               verbose=0)
 
     space = {
-        # 'lr': Real(0.001, 0.04, 'log-uniform'),
+        'lr': Real(0.00005, 0.005, 'log-uniform'),
+        'max_epochs': Integer(250, 3500),
         # 'lengthscale': Real(1e-8, 0.1, 'log-uniform'),
-        # 'max_epochs': Integer(50, 1000),
-        'module__hidden_size_0': Integer(4, 133),
-        'module__hidden_size_1': Integer(8, 80),
-        'module__hidden_size_2': Integer(1, 64),
+        # 'module__hidden_size_0': Integer(4, 133),
+        # 'module__hidden_size_1': Integer(8, 80),
+        # 'module__hidden_size_2': Integer(1, 64),
     }
-    bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=200, cv=cv)
+    bayesian_optimization(concrete, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=28, cv=cv)
 
 
 def simple_nn_bo(x_train, y_train, x_test, y_test):
@@ -205,7 +241,7 @@ def simple_nn_bo(x_train, y_train, x_test, y_test):
                              criterion=torch.nn.MSELoss,
                              device=device,
                              lr=0.0015,
-                             max_epochs=150,
+                             max_epochs=300,
                              batch_size=1024,
                              train_split=None,
                              verbose=0)
@@ -222,31 +258,37 @@ def simple_nn_bo(x_train, y_train, x_test, y_test):
     bayesian_optimization(simple_nn, space, mse_scorer, x_train, y_train, x_test, y_test, n_iter=200)
 
 
-def simple_nn_aleo_bo(x_train, y_train, x_test, y_test):
+def simple_nn_aleo_bo(x_train, y_train, x_test, y_test, short_term):
     print('Simple NN Aleo')
+    if short_term:
+        hs = [24, 64, 32]
+    else:
+        hs = [132, 77, 50]
+    print(hs)
     simple_nn = AleatoricNNSkorch(
         module=SimpleNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
+        module__hidden_size=hs,
         optimizer=torch.optim.Adam,
         criterion=HeteroscedasticLoss,
         device=device,
-        lr=0.0015,
-        max_epochs=135,
+        lr=0.001,
+        # max_epochs=1000,
         batch_size=1024,
         train_split=None,
         verbose=0)
 
     space = {
-        # 'lr': Real(0.01, 0.1, 'log-uniform'),
-        # 'max_epochs': Integer(25, 500),
-        'module__hidden_size_0': Integer(4, 133),
-        'module__hidden_size_1': Integer(8, 80),
-        'module__hidden_size_2': Integer(1, 64),
-        # 'module__dropout_prob': Real(0, 0.5)
+        'lr': Real(0.00005, 0.005, 'log-uniform'),
+        'max_epochs': Integer(250, 3500),
+        # 'module__hidden_size_0': Integer(4, 133),
+        # 'module__hidden_size_1': Integer(8, 80),
+        # 'module__hidden_size_2': Integer(1, 64),
+        # 'module__dropout_prob': Real(0, 0.3)
     }
 
-    bayesian_optimization(simple_nn, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=200)
+    bayesian_optimization(simple_nn, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=28, cv=3)
 
 
 if __name__ == '__main__':
