@@ -1,6 +1,7 @@
 import datetime
 import os
 
+import gpytorch
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
@@ -17,6 +18,8 @@ from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
+from models.quantile_regression import QuantRegFix
+from models.simple_gp import ExactGPModel
 from models.simple_nn import SimpleNN
 from models.skorch_wrappers.aleotoric_nn_skorch import AleatoricNNSkorch
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
@@ -24,6 +27,7 @@ from models.skorch_wrappers.bnn_skorch import BNNSkorch
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
+from models.skorch_wrappers.simple_gp_skorch import SimpleGPSkorch
 from models.torch_bnn import TorchBNN
 from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
@@ -31,7 +35,7 @@ from training.training_util import load_train
 from util.data.data_src_tools import load_opsd_de_load_statistics, load_opsd_de_load_transparency, load_opsd_de_load_dataset
 import time
 
-from util.data.data_tools import gen_synth_ood_data_like
+from util.data.data_tools import gen_synth_ood_data_like, inverse_transform_normal
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
@@ -58,6 +62,7 @@ def main():
     timestamp_test = test_df.index.to_numpy()
 
     y_test_orig = scaler.inverse_transform(y_test) + offset_test
+    y_train_orig = scaler.inverse_transform(y_train) + offset_train
 
     # random data to serve as out of distribution data
     # to test epistemic unc. capabilities of models
@@ -65,7 +70,7 @@ def main():
     x_ood, _, offset_ood = dataset_df_to_np(ood_df)
 
     # initialize and evaluate all methods, train and save if load_saved_models is false
-    load_saved_models = False
+    load_saved_models = True
     result_df = init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
                         prefix, result_folder, short_term, load_saved=load_saved_models)
 
@@ -91,15 +96,17 @@ def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_tes
 
 
 def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood_rand, offset_ood, scaler, model_folder,
-                        prefix, result_folder, short_term, load_saved=False):
+                        prefix, result_folder, short_term, load_saved=False, recalibrate=False):
     models = {}
 
-    models['linear_reg'] = linear_regression_init(x_train, y_train, short_term)
-    # models['simple_nn_aleo'] = simple_aleo_nn_init(x_train, y_train, short_term)
+    # models['linear_reg'] = linear_regression_init(x_train, y_train, short_term)
+    # models['quantile_reg'] = quantile_regression_init(x_train, y_train, short_term)
+    # models['gp'] = simple_gp_init(x_train, y_train, short_term)
+    models['simple_nn_aleo'] = simple_aleo_nn_init(x_train, y_train, short_term)
     # models['concrete'] = concrete_init(x_train, y_train, short_term)
     # models['fnp'] = fnp_init(x_train, y_train, short_term)
     # models['deep_ens'] = deep_ensemble_init(x_train, y_train, short_term)
-    models['bnn'] = bnn_init(x_train, y_train, short_term)
+    # models['bnn'] = bnn_init(x_train, y_train, short_term)
     # models['dgp'] = deep_gp_init(x_train, y_train, short_term)
 
     time_df = pd.DataFrame(index=models.keys(), columns=['train_time', 'predict_time'])
@@ -111,12 +118,18 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
             models[key] = models[key].fit()
             end = time.time_ns()
             time_df.loc[key, 'train_time'] = end - start
+        elif key == 'quantile_reg':
+            start = time.time_ns()
+            models[key] = [models[key].fit(q=q) for q in [0.25, 0.5, 0.75]]
+            end = time.time_ns()
+            time_df.loc[key, 'train_time'] = end - start
         else:
             time_df.loc[key, 'train_time'] = load_train(models[key], x_train, y_train, key, model_folder, prefix,
                                                         load_saved=load_saved)
 
     if 'fnp' in models:
-        models['fnp'].choose_r(x_train, y_train)  # set up reference set in case the model was loaded
+        # set up reference set in case the model was loaded
+        models['fnp'].choose_r(x_train, y_train)
 
     pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, offset_test, scaler)
     _, pred_ood_vars, _ = predict_transform_multiple(models, x_ood_rand, offset_ood, scaler)
@@ -138,6 +151,15 @@ def linear_regression_init(x_train, y_train, short_term):
     linear_reg = sm.OLS(y_train, x_train_lr)
 
     return linear_reg
+
+
+def quantile_regression_init(x_train, y_train, short_term):
+    # statsmodels quantile regression as reference
+    # different to other models because not scikit learn / skorch
+    x_train_qr = sm.add_constant(x_train)
+    quantile_reg = QuantRegFix(y_train, x_train_qr)
+
+    return quantile_reg
 
 
 def simple_aleo_nn_init(x_train, y_train, short_term):
@@ -165,6 +187,25 @@ def simple_aleo_nn_init(x_train, y_train, short_term):
     return simple_nn
 
 
+def simple_gp_init(x_train, y_train, short_term):
+    likelihood = gpytorch.likelihoods.GaussianLikelihood()
+
+    gp = SimpleGPSkorch(
+        module=ExactGPModel,
+        x_train=x_train,
+        y_train=y_train,
+        module__likelihood=likelihood,
+        lr=0.001,
+        max_epochs=20,
+        batch_size=1024,
+        train_split=None,
+        verbose=1,
+        optimizer=torch.optim.Adam,
+        device=device)
+
+    return gp
+
+
 def deep_gp_init(x_train, y_train, short_term):
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
@@ -188,7 +229,7 @@ def bnn_init(x_train, y_train, short_term):
     # paramters found through hyperparameter optimization
     if short_term:
         hs = [24, 64, 32]
-        prior_mu = -2.4
+        prior_mu = 0
         prior_sigma = 0.1
     else:
         hs = [132, 77, 50]
