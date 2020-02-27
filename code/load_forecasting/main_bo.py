@@ -1,7 +1,7 @@
 import torch
 from sklearn.model_selection import train_test_split
 from skopt.space import Real, Integer
-from skorch.callbacks import EarlyStopping
+from skorch.callbacks import EarlyStopping, EpochTimer, ProgressBar
 
 from load_forecasting.forecast_util import dataset_df_to_np
 from models.concrete_dropout import ConcreteDropoutNN
@@ -30,7 +30,7 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 # benchmark using opsd data to make a simple forecast using different methods
 # and hyperparameter optimization
 def main():
-    short_term = False
+    short_term = True
     train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False)
 
     x_train, y_train, offset_train = dataset_df_to_np(train_df)
@@ -40,7 +40,7 @@ def main():
     print('OPSD ENTSOE-E Transparency')
     print('short term: %r' % short_term)
 
-    bnn_bo(x_train, y_train, x_test, y_test, short_term)
+    fnp_bo(x_train, y_train, x_test, y_test, short_term)
 
 
 def deep_gp_bo(x_train, y_train, x_test, y_test):
@@ -148,6 +148,8 @@ def deep_ens_bo(x_train, y_train, x_test, y_test, short_term):
 
 
 def fnp_bo(x_train, y_train, x_test, y_test, short_term):
+    progress_bar_ep = ProgressBar()
+    early_stopping = EarlyStopping(monitor='train_loss', patience=8)
     cv = 3
     if short_term:
         hs_enc = [24, 64]
@@ -168,31 +170,32 @@ def fnp_bo(x_train, y_train, x_test, y_test, short_term):
         optimizer=torch.optim.Adam,
         device=device,
         train_size=int((1 - 1 / cv) * x_train.shape[0]),
-        verbose=0,
         module__dim_u=3,
         module__dim_z=50,
         module__fb_z=2.0,
         lr=0.001,
         reference_set_size_ratio=0.08,
-        max_epochs=100,
-        batch_size=128
+        max_epochs=8,
+        batch_size=1024,
+        verbose=1,
+        callbacks=[progress_bar_ep, early_stopping]
     )
 
     space = {
         # 'lr': Real(0.001, 0.01, 'log-uniform'),
-        # 'max_epochs': Integer(1, 2),
+        # 'max_epochs': Integer(1, 100),
         # 'batch_size': [32, 64, 128],
-        # 'module__dim_u': Integer(1, 16),
-        # 'module__dim_z': Integer(8, 128),
-        # 'module__fb_z': Real(0, 2.0),
+        'module__dim_u': Integer(1, 12),
+        'module__dim_z': Integer(8, 128),
+        'module__fb_z': Real(0, 2.4),
         # 'reference_set_size_ratio': Real(0.01, 0.4),
-        'module__hidden_size_enc_0': Integer(1, 256),
-        'module__hidden_size_enc_1': Integer(1, 256),
-        'module__hidden_size_dec_0': Integer(1, 256),
-        'module__hidden_size_dec_1': Integer(1, 256),
+        # 'module__hidden_size_enc_0': Integer(1, 256),
+        # 'module__hidden_size_enc_1': Integer(1, 256),
+        # 'module__hidden_size_dec_0': Integer(1, 256),
+        # 'module__hidden_size_dec_1': Integer(1, 256),
     }
 
-    bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=200, cv=cv)
+    bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=24, cv=cv, n_jobs=2)
 
 
 def concrete_bo(x_train, y_train, x_test, y_test, short_term):
@@ -202,8 +205,12 @@ def concrete_bo(x_train, y_train, x_test, y_test, short_term):
     # hs = [128, 16, 56]
     if short_term:
         hs = [24, 64, 32]
+        lr = 0.00051
+        epochs = 3400
     else:
         hs = [132, 77, 50]
+        lr = 0.0001
+        epochs = 271
     print(hs)
     concrete = ConcreteSkorch(module=ConcreteDropoutNN,
                               module__input_size=x_train.shape[-1],
@@ -213,7 +220,8 @@ def concrete_bo(x_train, y_train, x_test, y_test, short_term):
                               dataset_size=int((1 - 1 / cv) * x_train.shape[0]),
                               sample_count=30,
                               train_split=None,
-                              max_epochs=1000,
+                              max_epochs=epochs,
+                              lr=lr,
                               batch_size=1024,
                               optimizer=torch.optim.Adam,
                               criterion=HeteroscedasticLoss,
@@ -221,9 +229,9 @@ def concrete_bo(x_train, y_train, x_test, y_test, short_term):
                               verbose=0)
 
     space = {
-        'lr': Real(0.00005, 0.005, 'log-uniform'),
-        'max_epochs': Integer(250, 3500),
-        # 'lengthscale': Real(1e-8, 0.1, 'log-uniform'),
+        # 'lr': Real(0.00005, 0.005, 'log-uniform'),
+        # 'max_epochs': Integer(250, 3500),
+        'lengthscale': Real(1e-9, 0.1, 'log-uniform'),
         # 'module__hidden_size_0': Integer(4, 133),
         # 'module__hidden_size_1': Integer(8, 80),
         # 'module__hidden_size_2': Integer(1, 64),

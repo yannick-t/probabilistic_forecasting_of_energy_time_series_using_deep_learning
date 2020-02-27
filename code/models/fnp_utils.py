@@ -78,6 +78,7 @@ class Normal(object):
 
     def sample(self, **kwargs):
         eps = torch.normal(torch.Tensor(self.means.size()).zero_(), torch.Tensor(self.means.size()).fill_(1))
+        eps = eps.to(self.means.device)
         return self.means + self.logscales.exp() * eps
 
     def rsample(self, **kwargs):
@@ -114,7 +115,7 @@ def sample_DAG(Z, g, training=True, temperature=0.3):
         G = p_edges.sample()
 
     # embed the upper triangular to the adjacency matrix
-    unsorted_G = torch.Tensor(Z.size(0), Z.size(0)).zero_()
+    unsorted_G = torch.Tensor(Z.size(0), Z.size(0)).zero_().to(Z.device)
     unsorted_G[idx_utr[0], idx_utr[1]] = G.squeeze()
     # unsort the dag to conform to the data order
     original_idx = torch.sort(sort_idx)[1]
@@ -143,7 +144,7 @@ def sample_bipartite(Z1, Z2, g, training=True, temperature=0.3):
         A_vals = p_edges.sample()
 
     # embed the values to the adjacency matrix
-    A = torch.Tensor(Z1.size(0), Z2.size(0)).zero_()
+    A = torch.Tensor(Z1.size(0), Z2.size(0)).zero_().to(Z1.device)
     A[indices[:, 0], indices[:, 1]] = A_vals.squeeze()
 
     return A
