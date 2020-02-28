@@ -6,9 +6,10 @@ from torch.distributions import Normal
 
 
 class DeepGPHeteroscedasticLoss(nn.Module):
-    def __init__(self, likelihood, model, num_data):
+    def __init__(self, likelihood, model, num_data, base_loss):
         super().__init__()
         self.mll = DeepApproximateMLL(VariationalELBO(likelihood=likelihood, model=model, num_data=num_data))
+        self.base_loss = base_loss
 
     def forward(self, preds, target):
         assert not target.requires_grad
@@ -22,9 +23,8 @@ class DeepGPHeteroscedasticLoss(nn.Module):
 
         std = torch.sigmoid(std)
 
-        # bayesian ll
-        dist = Normal(mean, std)
-        loss = (dist.log_prob(target)).mean(0)
+        # base loss
+        loss = -self.base_loss(mean, std, target)
         loss = loss.mean(0)
         loss = loss.mean(-1)
         covar_shape = preds.covariance_matrix.shape

@@ -6,7 +6,9 @@ import numpy as np
 
 def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     count = len(pred_y_mean)
-    fig, axes = plt.subplots(1, count, sharey='row', figsize=(6, 1.8))
+    max_columns = 3
+    rows = int(count / (max_columns + 1)) + 1
+    fig, axes = plt.subplots(rows, min(count, max_columns), sharey='row', figsize=(6, rows * 1.8))
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
         ax = axes[counter]
         ax.set_title(name)
@@ -17,7 +19,9 @@ def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
 
 def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     count = len(pred_y_mean)
-    fig, axes = plt.subplots(1, count, sharey='row', figsize=(6, 1.8))
+    max_columns = 3
+    rows = int(count / (max_columns + 1)) + 1
+    fig, axes = plt.subplots(rows, min(count, max_columns), sharey='row', figsize=(6, rows * 1.8))
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
         ax = axes[counter]
         ax.set_title(name)

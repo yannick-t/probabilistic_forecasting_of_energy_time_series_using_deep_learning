@@ -6,11 +6,13 @@ from skorch.utils import to_numpy, to_tensor
 
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from training.loss.deepgp_heteroscedastic_loss import DeepGPHeteroscedasticLoss
+from training.loss.torch_loss_fns import bnll
 
 
 class DeepGPSkorch(BaseNNSkorch):
-    def __init__(self, num_data, *args, **kwargs):
+    def __init__(self, num_data, base_loss=bnll, *args, **kwargs):
         self.num_data = num_data
+        self.base_loss = base_loss
         kwargs['criterion'] = None
         self.module__likelihood = GaussianLikelihood()
         super().__init__(*args, **kwargs)
@@ -34,7 +36,7 @@ class DeepGPSkorch(BaseNNSkorch):
     def initialize_criterion(self):
         """Initializes the criterion."""
         criterion_params = self._get_params_for('criterion')
-        self.criterion_ = DeepGPHeteroscedasticLoss(likelihood=self.module__likelihood, model=self.module_, num_data=self.num_data)
+        self.criterion_ = DeepGPHeteroscedasticLoss(likelihood=self.module__likelihood, model=self.module_, num_data=self.num_data, base_loss=self.base_loss)
         if isinstance(self.criterion_, torch.nn.Module):
             self.criterion_ = self.criterion_.to(self.device)
         return self

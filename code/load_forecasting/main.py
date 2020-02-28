@@ -1,41 +1,32 @@
-import datetime
-import os
+import time
 
-import gpytorch
-import matplotlib.pyplot as plt
-import torch
-import numpy as np
-from sklearn.model_selection import train_test_split
-from skorch.callbacks import EarlyStopping
 import pandas as pd
 import statsmodels.api as sm
+import torch
+from skorch.callbacks import EarlyStopping
 
-from evaluation.evaluate_forecasting_util import plot_test_data, evaluate_multiple, evaluate_multi_step, evaluate_single
-from evaluation.scoring import rmse, mape, crps, log_likelihood
-from load_forecasting.predict import predict_transform_multiple, predict_transform
+from evaluation.evaluate_forecasting_util import evaluate_multiple, evaluate_single
 from load_forecasting.forecast_util import dataset_df_to_np
+from load_forecasting.predict import predict_transform_multiple, predict_transform
 from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
 from models.quantile_regression import QuantRegFix
-from models.simple_gp import ExactGPModel
 from models.simple_nn import SimpleNN
 from models.skorch_wrappers.aleotoric_nn_skorch import AleatoricNNSkorch
-from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from models.skorch_wrappers.bnn_skorch import BNNSkorch
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
-from models.skorch_wrappers.simple_gp_skorch import SimpleGPSkorch
 from models.torch_bnn import TorchBNN
 from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
+from training.loss.torch_loss_fns import crps, bnll
 from training.training_util import load_train
-from util.data.data_src_tools import load_opsd_de_load_statistics, load_opsd_de_load_transparency, load_opsd_de_load_dataset
-import time
-
-from util.data.data_tools import gen_synth_ood_data_like, inverse_transform_normal
+from util.data.data_src_tools import load_opsd_de_load_dataset
+from util.data.data_tools import gen_synth_ood_data_like
+from util.model_enum import ModelEnum
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
@@ -51,11 +42,32 @@ def main():
     prefix = 'load_forecasting_'
     result_folder = '../results/'
 
+    # models = [ModelEnum.linear_reg, ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
+    #           ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
+    models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo]
+
+    evaluate_models(model_folder, prefix, result_folder, short_term, models, load_saved_models=True)
+
+
+def evaluate_models(model_folder, prefix, result_folder, short_term, models=None, load_saved_models=False, crps_loss=False):
+    # evaluate given models fot the thesis, training with found hyper parameters
+    # (initialization with parameters is located in the init method for each method)
+    # default to all models
+
+    # prefix for models and results to be saved as
     if short_term:
         prefix = prefix + 'short_term_'
+    if crps_loss:
+        prefix = prefix + 'crps_'
+    model_prefix = prefix
+    if models is not None:
+        result_prefix = prefix + '_'.join([m.name for m in models]) + '_'
+    else:
+        result_prefix = prefix + 'all_'
 
     # load / preprocess dataset if needed
-    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False, n_ahead=1)
+    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False,
+                                                          n_ahead=1)
 
     x_train, y_train, offset_train = dataset_df_to_np(train_df)
     x_test, y_test, offset_test = dataset_df_to_np(test_df)
@@ -70,19 +82,82 @@ def main():
     x_ood, _, offset_ood = dataset_df_to_np(ood_df)
 
     # initialize and evaluate all methods, train and save if load_saved_models is false
-    load_saved_models = True
-    result_df = init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
-                        prefix, result_folder, short_term, load_saved=load_saved_models)
+    result_df = init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler,
+                                    model_folder, model_prefix, result_prefix, result_folder, short_term,
+                                    load_saved=load_saved_models, model_names=models, crps=crps_loss)
 
     # save result csv
     if not load_saved_models:
         # save train time
-        result_df[['train_time']].to_csv(result_folder + prefix + 'train_time.csv')
+        result_df[['train_time']].to_csv(result_folder + result_prefix + 'train_time.csv')
     else:
         # load train time
-        train_time_df = pd.read_csv(result_folder + prefix + 'train_time.csv', index_col=0)
+        train_time_df = pd.read_csv(result_folder + result_prefix + 'train_time.csv', index_col=0)
         result_df.loc[:, 'train_time'] = train_time_df.loc[:, 'train_time']
-    result_df.to_csv(result_folder + prefix + 'results.csv', index_label='method')
+    result_df.to_csv(result_folder + result_prefix + 'results.csv', index_label='method')
+
+
+def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood_rand, offset_ood, scaler, model_folder,
+                        model_prefix, result_prefix, result_folder, short_term, load_saved=False, model_names=None, crps=False):
+    if model_names is None:
+        model_names = [n for n in ModelEnum]
+    models = {}
+
+    # init selected models
+    for n in model_names:
+        if n == ModelEnum.linear_reg:
+            models[n.name] = linear_regression_init(x_train, y_train, short_term)
+        elif n == ModelEnum.quantile_reg:
+            models[n.name] = quantile_regression_init(x_train, y_train, short_term)
+        elif n == ModelEnum.simple_nn_aleo:
+            models[n.name] = simple_aleo_nn_init(x_train, y_train, short_term, crps)
+        elif n == ModelEnum.concrete:
+            models[n.name] = concrete_init(x_train, y_train, short_term, crps)
+        elif n == ModelEnum.fnp:
+            models[n.name] = fnp_init(x_train, y_train, short_term)
+        elif n == ModelEnum.deep_ens:
+            models[n.name] = deep_ensemble_init(x_train, y_train, short_term, crps)
+        elif n == ModelEnum.bnn:
+            models[n.name] = bnn_init(x_train, y_train, short_term, crps)
+        elif n == ModelEnum.dgp:
+            models[n.name] = deep_gp_init(x_train, y_train, short_term, crps)
+
+    time_df = pd.DataFrame(index=models.keys(), columns=['train_time', 'predict_time'])
+
+    # train or load initialized models
+    for key in models:
+        if key == ModelEnum.linear_reg.name:
+            # not a skorch model, separate training
+            start = time.time_ns()
+            models[key] = models[key].fit()
+            end = time.time_ns()
+            time_df.loc[key, 'train_time'] = end - start
+        elif key == ModelEnum.quantile_reg.name:
+            # not a skorch model, separate training
+            start = time.time_ns()
+            models[key] = [models[key].fit(q=q) for q in [0.25, 0.5, 0.75]]
+            end = time.time_ns()
+            time_df.loc[key, 'train_time'] = end - start
+        else:
+            time_df.loc[key, 'train_time'] = load_train(models[key], x_train, y_train, key, model_folder, model_prefix,
+                                                        load_saved=load_saved)
+
+    # set up reference set in case the model was loaded (needed for fnp)
+    if ModelEnum.fnp.name in models:
+        models[ModelEnum.fnp.name].choose_r(x_train, y_train)
+
+    pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, offset_test, scaler)
+    _, pred_ood_vars, _ = predict_transform_multiple(models, x_ood_rand, offset_ood, scaler)
+    time_df.loc[:, 'predict_time'] = pred_times
+
+    # convert times
+    time_df.loc[:, 'train_time'] = time_df.loc[:, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
+    time_df.loc[:, 'predict_time'] = time_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
+
+    # evaluate models (including plots and scores)
+    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, y_test_orig, pred_ood_vars, result_folder, result_prefix)
+
+    return pd.concat([time_df, scores_df], axis=1)
 
 
 def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,
@@ -93,55 +168,6 @@ def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_tes
     _, pred_ood_var, _ = predict_transform(model, x_ood, scaler, offset_ood, name)
 
     evaluate_single(pred_mean, pred_var, y_test_orig, pred_ood_var)
-
-
-def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood_rand, offset_ood, scaler, model_folder,
-                        prefix, result_folder, short_term, load_saved=False, recalibrate=False):
-    models = {}
-
-    # models['linear_reg'] = linear_regression_init(x_train, y_train, short_term)
-    # models['quantile_reg'] = quantile_regression_init(x_train, y_train, short_term)
-    # models['gp'] = simple_gp_init(x_train, y_train, short_term)
-    models['simple_nn_aleo'] = simple_aleo_nn_init(x_train, y_train, short_term)
-    # models['concrete'] = concrete_init(x_train, y_train, short_term)
-    # models['fnp'] = fnp_init(x_train, y_train, short_term)
-    # models['deep_ens'] = deep_ensemble_init(x_train, y_train, short_term)
-    # models['bnn'] = bnn_init(x_train, y_train, short_term)
-    # models['dgp'] = deep_gp_init(x_train, y_train, short_term)
-
-    time_df = pd.DataFrame(index=models.keys(), columns=['train_time', 'predict_time'])
-
-    for key in models:
-        if key == 'linear_reg':
-            # not a skorch model, separate training
-            start = time.time_ns()
-            models[key] = models[key].fit()
-            end = time.time_ns()
-            time_df.loc[key, 'train_time'] = end - start
-        elif key == 'quantile_reg':
-            start = time.time_ns()
-            models[key] = [models[key].fit(q=q) for q in [0.25, 0.5, 0.75]]
-            end = time.time_ns()
-            time_df.loc[key, 'train_time'] = end - start
-        else:
-            time_df.loc[key, 'train_time'] = load_train(models[key], x_train, y_train, key, model_folder, prefix,
-                                                        load_saved=load_saved)
-
-    if 'fnp' in models:
-        # set up reference set in case the model was loaded
-        models['fnp'].choose_r(x_train, y_train)
-
-    pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, offset_test, scaler)
-    _, pred_ood_vars, _ = predict_transform_multiple(models, x_ood_rand, offset_ood, scaler)
-    time_df.loc[:, 'predict_time'] = pred_times
-
-    # convert times
-    time_df.loc[:, 'train_time'] = time_df.loc[key, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
-    time_df.loc[:, 'predict_time'] = time_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
-
-    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, y_test_orig, pred_ood_vars, result_folder, prefix)
-
-    return pd.concat([time_df, scores_df], axis=1)
 
 
 def linear_regression_init(x_train, y_train, short_term):
@@ -162,7 +188,12 @@ def quantile_regression_init(x_train, y_train, short_term):
     return quantile_reg
 
 
-def simple_aleo_nn_init(x_train, y_train, short_term):
+def simple_aleo_nn_init(x_train, y_train, short_term, crps_loss=False):
+    if crps_loss:
+        loss = CRPSLoss
+    else:
+        loss = HeteroscedasticLoss
+
     if short_term:
         hs = [24, 64, 32]
     else:
@@ -178,7 +209,7 @@ def simple_aleo_nn_init(x_train, y_train, short_term):
         max_epochs=100,
         train_split=None,
         optimizer=torch.optim.Adam,
-        criterion=HeteroscedasticLoss,
+        criterion=loss,
         device=device,
         verbose=1,
         # callbacks=[es]
@@ -187,26 +218,12 @@ def simple_aleo_nn_init(x_train, y_train, short_term):
     return simple_nn
 
 
-def simple_gp_init(x_train, y_train, short_term):
-    likelihood = gpytorch.likelihoods.GaussianLikelihood()
+def deep_gp_init(x_train, y_train, short_term, crps_loss=False):
+    if crps_loss:
+        loss = crps
+    else:
+        loss = bnll
 
-    gp = SimpleGPSkorch(
-        module=ExactGPModel,
-        x_train=x_train,
-        y_train=y_train,
-        module__likelihood=likelihood,
-        lr=0.001,
-        max_epochs=20,
-        batch_size=1024,
-        train_split=None,
-        verbose=1,
-        optimizer=torch.optim.Adam,
-        device=device)
-
-    return gp
-
-
-def deep_gp_init(x_train, y_train, short_term):
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
         module__input_size=x_train.shape[-1],
@@ -218,6 +235,7 @@ def deep_gp_init(x_train, y_train, short_term):
         batch_size=1024,
         train_split=None,
         verbose=1,
+        base_loss=loss,
         optimizer=torch.optim.Adam,
         num_data=x_train.shape[0],
         device=device)
@@ -225,7 +243,12 @@ def deep_gp_init(x_train, y_train, short_term):
     return dgp
 
 
-def bnn_init(x_train, y_train, short_term):
+def bnn_init(x_train, y_train, short_term, crps_loss=False):
+    if crps_loss:
+        loss = CRPSLoss
+    else:
+        loss = HeteroscedasticLoss
+
     # paramters found through hyperparameter optimization
     if short_term:
         hs = [24, 64, 32]
@@ -250,19 +273,20 @@ def bnn_init(x_train, y_train, short_term):
         verbose=1,
         batch_size=1024,
         optimizer=torch.optim.Adam,
-        criterion=HeteroscedasticLoss,
+        criterion=loss,
         device=device)
 
     return bnn
 
 
 def fnp_init(x_train, y_train, short_term):
+
     fnp = RegressionFNPSkorch(
         module=RegressionFNP,
         module__dim_x=x_train.shape[-1],
         module__dim_y=y_train.shape[-1],
-        module__hidden_size_enc=[64, 64],
-        module__hidden_size_dec=[64, 64],
+        module__hidden_size_enc=[32],
+        module__hidden_size_dec=[32],
         optimizer=torch.optim.Adam,
         device=device,
         seed=42,
@@ -281,7 +305,12 @@ def fnp_init(x_train, y_train, short_term):
     return fnp
 
 
-def deep_ensemble_init(x_train, y_train, short_term):
+def deep_ensemble_init(x_train, y_train, short_term, crps_loss=False):
+    if crps_loss:
+        loss = CRPSLoss
+    else:
+        loss = HeteroscedasticLoss
+
     # paramters found through hyperparameter optimization
     if short_term:
         hs = [24, 64, 32]
@@ -296,14 +325,19 @@ def deep_ensemble_init(x_train, y_train, short_term):
         max_epochs=3000,
         batch_size=1024,
         optimizer=torch.optim.Adam,
-        criterion=HeteroscedasticLoss,
+        criterion=loss,
         device=device
     )
 
     return ensemble_model
 
 
-def concrete_init(x_train, y_train, short_term):
+def concrete_init(x_train, y_train, short_term, crps_loss=False):
+    if crps_loss:
+        loss = CRPSLoss
+    else:
+        loss = HeteroscedasticLoss
+
     # paramters found through hyperparameter optimization
     if short_term:
         hs = [24, 64, 32]
@@ -324,7 +358,7 @@ def concrete_init(x_train, y_train, short_term):
         max_epochs=108,
         batch_size=1024,
         optimizer=torch.optim.Adam,
-        criterion=HeteroscedasticLoss,
+        criterion=loss,
         device=device)
 
     return concrete_model
