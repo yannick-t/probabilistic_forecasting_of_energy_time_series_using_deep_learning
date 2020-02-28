@@ -31,8 +31,9 @@ def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars, resul
     plt.savefig(result_folder + result_prefix + 'calibration_sharpness.pdf')
 
     # epistemic out of distribution evaluation
-    sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, pred_ood_vars)
-    plt.savefig(result_folder + result_prefix + 'sharpness_ood.pdf')
+    for counter, p_ood in enumerate(pred_ood_vars):
+        sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
+        plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
 
     plt.show()
 

@@ -10,13 +10,17 @@ from statsmodels.tsa.api import ExponentialSmoothing, STL, seasonal_decompose
 import matplotlib.pyplot as plt
 
 
-def gen_synth_ood_data_like(test_df, short_term=True):
-    # randomize load
-    df_synth = pd.DataFrame(index=test_df.index, columns=['load'])
-    np.random.seed(333)
-    df_synth.loc[:, 'load'] = np.random.uniform(test_df.loc[:, 'target_0'].min(), test_df.loc[:, 'target_0'].max(), test_df.loc[:, 'target_0'].shape)
+def gen_synth_ood_data_like(test_df, short_term=True, seed=333, variation=0):
+    # randomized load and time
+    np.random.seed(seed)
+    index = test_df.index + timedelta(days=np.random.randint(-3000, 3000))
+    df_synth = pd.DataFrame(index=index, columns=['load'])
+    df_synth.loc[:, 'load'] = np.random.uniform(test_df.loc[:, 'target_0'].min() - variation,
+                                                test_df.loc[:, 'target_0'].max() + variation,
+                                                test_df.loc[:, 'target_0'].shape)
+
     # construct features the same way as for other datasets (inidcator variables should realistically not be random)
-    return construct_features(df_synth, pd.DataFrame(0, index=test_df.index, columns=['load']), short_term=short_term)
+    return construct_features(df_synth, pd.DataFrame(0, index=index, columns=['load']), short_term=short_term)
 
 
 def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, scaler=None, n_ahead=1):

@@ -7,7 +7,7 @@ import statsmodels.api as sm
 from util.data.data_tools import inverse_transform_normal
 
 
-def predict_transform_multiple(models, x_test, offset_test, scaler):
+def predict_transform_multiple(models, x_test, scaler, offset_test=None):
     pred_means = []
     pred_vars = []
     times = []
@@ -20,13 +20,14 @@ def predict_transform_multiple(models, x_test, offset_test, scaler):
     return pred_means, pred_vars, times
 
 
-def predict_transform(model, x_test, scaler, offset_test, model_name=''):
+def predict_transform(model, x_test, scaler, offset_test=None, model_name=''):
     # predict and inverse transform
     pred_y_mean, pred_y_var, pred_time = predict(model, x_test, model_name)
 
     pred_y_mean, pred_y_std = inverse_transform_normal(pred_y_mean, np.sqrt(pred_y_var), scaler)
     pred_y_var = pred_y_std ** 2
-    pred_y_mean = pred_y_mean + offset_test
+    if offset_test is not None:
+        pred_y_mean = pred_y_mean + offset_test
 
     return pred_y_mean, pred_y_var, pred_time
 

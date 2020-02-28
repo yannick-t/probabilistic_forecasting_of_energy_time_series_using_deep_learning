@@ -2,6 +2,7 @@ import time
 
 import pandas as pd
 import statsmodels.api as sm
+import numpy as np
 import torch
 from skorch.callbacks import EarlyStopping
 
@@ -44,9 +45,9 @@ def main():
 
     # models = [ModelEnum.linear_reg, ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
     #           ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo]
+    models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete]
 
-    evaluate_models(model_folder, prefix, result_folder, short_term, models, load_saved_models=True)
+    evaluate_models(model_folder, prefix, result_folder, short_term, models, load_saved_models=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, models=None, load_saved_models=False, crps_loss=False):
@@ -78,11 +79,22 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, models=None
 
     # random data to serve as out of distribution data
     # to test epistemic unc. capabilities of models
-    ood_df = gen_synth_ood_data_like(test_df, short_term=short_term)
-    x_ood, _, offset_ood = dataset_df_to_np(ood_df)
+    x_oods = []
+    # similar data to test set in dimensions of load and real indicator values
+    ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322)
+    x_ood_0, _, _ = dataset_df_to_np(ood_0_df)
+    x_oods.append(x_ood_0)
+    # very differenct ranges
+    ood_1_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=42, variation=4)
+    x_ood_1, _, _ = dataset_df_to_np(ood_1_df)
+    x_oods.append(x_ood_1)
+    # completely random (including indicator variables)
+    np.random.seed(492)
+    x_ood_2 = np.random.uniform(-2, 2, size=x_test.shape)
+    x_oods.append(x_ood_2)
 
     # initialize and evaluate all methods, train and save if load_saved_models is false
-    result_df = init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler,
+    result_df = init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oods, scaler,
                                     model_folder, model_prefix, result_prefix, result_folder, short_term,
                                     load_saved=load_saved_models, model_names=models, crps=crps_loss)
 
@@ -97,7 +109,7 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, models=None
     result_df.to_csv(result_folder + result_prefix + 'results.csv', index_label='method')
 
 
-def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_ood_rand, offset_ood, scaler, model_folder,
+def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oods, scaler, model_folder,
                         model_prefix, result_prefix, result_folder, short_term, load_saved=False, model_names=None, crps=False):
     if model_names is None:
         model_names = [n for n in ModelEnum]
@@ -146,9 +158,13 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
     if ModelEnum.fnp.name in models:
         models[ModelEnum.fnp.name].choose_r(x_train, y_train)
 
-    pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, offset_test, scaler)
-    _, pred_ood_vars, _ = predict_transform_multiple(models, x_ood_rand, offset_ood, scaler)
+    pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, scaler, offset_test=offset_test)
     time_df.loc[:, 'predict_time'] = pred_times
+
+    pred_ood_vars = []
+    for x_ood in x_oods:
+        _, pred, _ = predict_transform_multiple(models, x_ood, scaler)
+        pred_ood_vars.append(pred)
 
     # convert times
     time_df.loc[:, 'train_time'] = time_df.loc[:, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
