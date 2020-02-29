@@ -47,7 +47,7 @@ def main():
     #           ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete]
 
-    evaluate_models(model_folder, prefix, result_folder, short_term, models, load_saved_models=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term, models, load_saved_models=True)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, models=None, load_saved_models=False, crps_loss=False):
@@ -158,12 +158,12 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
     if ModelEnum.fnp.name in models:
         models[ModelEnum.fnp.name].choose_r(x_train, y_train)
 
-    pred_means, pred_vars, pred_times = predict_transform_multiple(models, x_test, scaler, offset_test=offset_test)
+    pred_means, pred_vars, pred_vars_aleo, _, pred_times = predict_transform_multiple(models, x_test, scaler, offset_test=offset_test)
     time_df.loc[:, 'predict_time'] = pred_times
 
     pred_ood_vars = []
     for x_ood in x_oods:
-        _, pred, _ = predict_transform_multiple(models, x_ood, scaler)
+        _, pred, _, _, _ = predict_transform_multiple(models, x_ood, scaler)
         pred_ood_vars.append(pred)
 
     # convert times
@@ -171,7 +171,7 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
     time_df.loc[:, 'predict_time'] = time_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
 
     # evaluate models (including plots and scores)
-    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, y_test_orig, pred_ood_vars, result_folder, result_prefix)
+    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars, result_folder, result_prefix)
 
     return pd.concat([time_df, scores_df], axis=1)
 

@@ -17,11 +17,11 @@ names_pretty_dict = {ModelEnum.simple_nn_aleo.name: 'Simple NN', ModelEnum.concr
                      ModelEnum.quantile_reg.name: 'Quantile Regression'}
 
 
-def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars, result_folder, result_prefix):
+def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, pred_ood_vars, result_folder, result_prefix):
     names_pretty = [names_pretty_dict[name] for name in names]
 
     # calibration
-    probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
+    probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y, pred_means, pred_vars_aleo)
     plt.savefig(result_folder + result_prefix + 'calibration_probabilistic.pdf')
     marginal_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
     plt.savefig(result_folder + result_prefix + 'calibration_marginal.pdf')

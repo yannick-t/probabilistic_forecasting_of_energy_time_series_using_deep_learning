@@ -190,3 +190,8 @@ def inverse_transform_normal(mean, std, scaler):
     std_transformed = np.abs(mean_std_transformed - mean_transformed)
 
     return mean_transformed, std_transformed
+
+
+def inverse_transform_normal_var(mean, var, scaler):
+    std = np.sqrt(var)
+    return inverse_transform_normal(mean, std, scaler)

@@ -51,4 +51,4 @@ def combine_uncertainties(preds, output_size):
     epistemic_std = preds[..., :outut_dim].std(dim=1)
     aleotoric_std = aleo_sampled.mean(dim=1)
 
-    return np.stack([to_numpy(mean), to_numpy(var), to_numpy(epistemic_std), to_numpy(aleotoric_std)], -1)
+    return np.stack([to_numpy(mean), to_numpy(var), to_numpy(epistemic_std**2), to_numpy(aleotoric_std**2)], -1)

@@ -4,32 +4,39 @@ import pandas as pd
 from datetime import timedelta
 import statsmodels.api as sm
 
-from util.data.data_tools import inverse_transform_normal
+from util.data.data_tools import inverse_transform_normal, inverse_transform_normal_var
 
 
 def predict_transform_multiple(models, x_test, scaler, offset_test=None):
     pred_means = []
     pred_vars = []
+    pred_vars_aleo = []
+    pred_vars_epis = []
     times = []
     for name in models:
-        pmean, pvar, time = predict_transform(models[name], x_test, scaler, offset_test, name)
+        pmean, pvar, pvara, pvare, time = predict_transform(models[name], x_test, scaler, offset_test, name)
         pred_means.append(pmean)
         pred_vars.append(pvar)
+        pred_vars_aleo.append(pvara)
+        pred_vars_epis.append(pvare)
         times.append(time)
 
-    return pred_means, pred_vars, times
+    return pred_means, pred_vars, pred_vars_aleo, pred_vars_epis, times
 
 
 def predict_transform(model, x_test, scaler, offset_test=None, model_name=''):
     # predict and inverse transform
-    pred_y_mean, pred_y_var, pred_time = predict(model, x_test, model_name)
+    pred_y_mean, pred_y_var, pred_y_var_aleo, pred_y_var_epis, pred_time = predict(model, x_test, model_name)
 
-    pred_y_mean, pred_y_std = inverse_transform_normal(pred_y_mean, np.sqrt(pred_y_var), scaler)
-    pred_y_var = pred_y_std ** 2
+    pred_y_mean, pred_y_var = inverse_transform_normal_var(pred_y_mean, pred_y_var, scaler)
+    if pred_y_var_aleo is not None:
+        _, pred_y_var_aleo = inverse_transform_normal_var(pred_y_mean, pred_y_var_aleo, scaler)
+    if pred_y_var_epis is not None:
+        _, pred_y_var_epis = inverse_transform_normal_var(pred_y_mean, pred_y_var_epis, scaler)
     if offset_test is not None:
         pred_y_mean = pred_y_mean + offset_test
 
-    return pred_y_mean, pred_y_var, pred_time
+    return pred_y_mean, pred_y_var, pred_y_var_aleo, pred_y_var_epis, pred_time
 
 
 def predict(model, x, model_name=''):
@@ -40,6 +47,8 @@ def predict(model, x, model_name=''):
 
         pred_y_mean = pred.predicted_mean
         pred_y_var = pred.var_pred_mean
+        pred_y_var_aleo = None
+        pred_y_var_epis = None
 
         if len(pred_y_mean.shape) == 1:
             pred_y_mean = pred_y_mean.reshape(-1, 1)
@@ -53,13 +62,16 @@ def predict(model, x, model_name=''):
         pred_means_var = np.array([pred.var_pred_mean for pred in preds])
         pred_y_mean = np.mean(pred_means, axis=0)
 
-        # pred_y_var = ((pred_means[2] - pred_means[0]) / 1.35) ** 2
+        pred_y_var_aleo = ((pred_means[2] - pred_means[0]) / 1.35) ** 2
+        pred_y_var_epis = np.mean(pred_means_var, axis=0)
 
         pred_y_var = np.mean((pred_means ** 2), axis=0) - pred_y_mean ** 2 + np.mean((pred_means_var ** 2), axis=0)
 
         if len(pred_y_mean.shape) == 1:
             pred_y_mean = pred_y_mean.reshape(-1, 1)
             pred_y_var = pred_y_var.reshape(-1, 1)
+            pred_y_var_aleo = pred_y_var_aleo.reshape(-1, 1)
+            pred_y_var_epis = pred_y_var_epis.reshape(-1, 1)
     else:
         start = time.time_ns()
         pred_y = model.predict(x)
@@ -67,10 +79,16 @@ def predict(model, x, model_name=''):
 
         pred_y_mean = pred_y[..., 0]
         pred_y_var = pred_y[..., 1]
+        if pred_y.shape[-1] == 4:
+            pred_y_var_epis = pred_y[..., 2]
+            pred_y_var_aleo = pred_y[..., 3]
+        else:
+            pred_y_var_epis = None
+            pred_y_var_aleo = None
 
     print('predict time ' + model_name + ' %d ns' % (end - start))
 
-    return pred_y_mean, pred_y_var, (end - start)
+    return pred_y_mean, pred_y_var, pred_y_var_aleo, pred_y_var_epis, (end - start)
 
 
 def predict_multi_step(model, test_df, lagged_short_term, horizon=1440):
