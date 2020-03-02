@@ -22,7 +22,7 @@ def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, pred
 
     if generate_plots:
         # calibration
-        probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y, pred_means, pred_vars_aleo)
+        probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
         plt.savefig(result_folder + result_prefix + 'calibration_probabilistic.pdf')
         marginal_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
         plt.savefig(result_folder + result_prefix + 'calibration_marginal.pdf')

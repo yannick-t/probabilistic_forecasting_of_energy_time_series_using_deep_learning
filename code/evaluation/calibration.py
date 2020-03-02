@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch.distributions import Normal
 import numpy as np
+import seaborn as sm
 
 from evaluation.evaluateion_plot_util import plot_multiple
 
@@ -44,17 +45,17 @@ def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
 
 
 def probabilistic_calibration(pred_y_mean, pred_y_var, y_true, ax, pred_y_mean_comp=None, pred_y_var_comp=None):
-
     # evaluate probabilistic calibration with PIT histogram
     n_bins = 20
 
     pt = pit_calc(pred_y_mean, pred_y_var, y_true)
-    ax.hist(pt, n_bins, color='lightblue', density=True, weights=np.zeros_like(pt) + 1. / pt.size, rwidth=0.9)
+
+    sm.distplot(pt, n_bins, kde=False, norm_hist=True, color='lightblue', hist_kws={'rwidth': 0.9}, ax=ax)
     if pred_y_var_comp is not None:
         pt1 = pit_calc(pred_y_mean_comp, pred_y_var_comp, y_true)
-        ax.hist(pt1, n_bins, color='orange', alpha=0.2, density=True, weights=np.zeros_like(pt1) + 1. / pt1.size, rwidth=0.9)
+        sm.distplot(pt1, n_bins, kde=False, norm_hist=True, color='orange', hist_kws={'rwidth': 0.9}, ax=ax)
 
-    # 1 line
+    # 1 line (uniform distribution)
     px = np.arange(0, 1, 0.01)
     ax.plot(px, np.repeat(1, px.shape), color='lightgray', linestyle="--", alpha=0.75)
 

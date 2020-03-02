@@ -9,7 +9,8 @@ from skorch.callbacks import EarlyStopping, EpochScoring
 from evaluation.evaluate_forecasting_util import evaluate_multiple, evaluate_single
 from evaluation.scoring import crps
 from load_forecasting.forecast_util import dataset_df_to_np
-from load_forecasting.predict import predict_transform_multiple, predict_transform
+from load_forecasting.post_processing import recalibrate
+from load_forecasting.predict import predict_transform_multiple, predict_transform, predict
 from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
@@ -47,15 +48,15 @@ def main():
     # models = [ModelEnum.quantile_reg, ModelEnum.linear_reg]
 
     # Forecasting case with short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=True, models=models, load_saved_models=False,
-                    generate_plots=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=False,
+                    generate_plots=True)
     # Forecasting case without short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=False, models=models, load_saved_models=False,
-                    generate_plots=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=False,
+                    generate_plots=True)
 
 
-def evaluate_models(model_folder, prefix, result_folder, short_term, models=None, load_saved_models=False,
-                    crps_loss=False, generate_plots=True):
+def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
+                    crps_loss=False, generate_plots=True, recalibrate=False):
     # evaluate given models fot the thesis, training with found hyper parameters
     # (initialization with parameters is located in the init method for each method)
     # default to all models
@@ -66,8 +67,8 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, models=None
     if crps_loss:
         prefix = prefix + 'crps_'
     model_prefix = prefix
-    if models is not None:
-        result_prefix = prefix + '_'.join([m.name for m in models]) + '_'
+    if model_names is not None:
+        result_prefix = prefix + '_'.join([m.name for m in model_names]) + '_'
     else:
         result_prefix = prefix + 'all_'
 
@@ -84,40 +85,28 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, models=None
 
     # random data to serve as out of distribution data
     # to test epistemic unc. capabilities of models
-    x_oods = []
-    # similar data to test set in dimensions of load and real indicator values
-    ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322)
-    x_ood_0, _, _ = dataset_df_to_np(ood_0_df)
-    x_oods.append(x_ood_0)
-    # very differenct ranges
-    ood_1_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=42, variation=4)
-    x_ood_1, _, _ = dataset_df_to_np(ood_1_df)
-    x_oods.append(x_ood_1)
-    # completely random (including indicator variables)
-    np.random.seed(492)
-    x_ood_2 = np.random.uniform(-2, 2, size=x_test.shape)
-    x_oods.append(x_ood_2)
+    x_oods = generate_ood_data(test_df, x_test, short_term)
 
     # initialize and evaluate all methods, train and save if load_saved_models is false
-    result_df = init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oods, scaler,
-                                    model_folder, model_prefix, result_prefix, result_folder, short_term,
-                                    load_saved=load_saved_models, model_names=models, crps=crps_loss,
-                                    generate_plots=generate_plots)
+    models = init_models(x_train, y_train, short_term, model_names)
+    models, train_times = train_load_models(models, x_train, y_train, model_folder, model_names, load_saved_models)
+    if load_saved_models:
+        train_times = None
 
-    # save result csv
-    if not load_saved_models:
-        # save train time
-        result_df[['train_time']].to_csv(result_folder + result_prefix + 'train_time.csv')
-    else:
-        # load train time
-        train_time_df = pd.read_csv(result_folder + result_prefix + 'train_time.csv', index_col=0)
-        result_df.loc[:, 'train_time'] = train_time_df.loc[:, 'train_time']
-    result_df.to_csv(result_folder + result_prefix + 'results.csv', index_label='method')
+    pred_means, pred_vars, pred_vars_aleo, pred_vars_epis, predict_times = \
+        models_predict_transform(models, x_test, scaler, offset_test)
+    (pred_ood_means, pred_ood_vars) = zip(*[models_predict_transform(models, x_ood, scaler)[0: 2] for x_ood in x_oods])
+
+    if recalibrate:
+        recals = models_recalibrate(models, x_train, y_train_orig, scaler, offset_train)
+        pred_means, pred_vars = models_post_process(pred_means, pred_vars, recals)
+        pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recals)[1] for pred_ood_m, pred_ood_v in zip(pred_ood_means, pred_ood_vars)]
+
+    scores = eval_models(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars, result_folder, result_prefix, generate_plots)
+    save_results(predict_times, scores, result_folder, result_prefix, train_time_df=train_times)
 
 
-def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oods, scaler, model_folder,
-                        model_prefix, result_prefix, result_folder, short_term, load_saved=False, model_names=None,
-                        crps=False, generate_plots=True):
+def init_models(x_train, y_train, short_term, model_names=None, crps=False):
     if model_names is None:
         model_names = [n for n in ModelEnum]
     models = {}
@@ -141,7 +130,11 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
         elif n == ModelEnum.dgp:
             models[n.name] = deep_gp_init(x_train, y_train, short_term, crps)
 
-    time_df = pd.DataFrame(index=models.keys(), columns=['train_time', 'predict_time'])
+    return models
+
+
+def train_load_models(models, x_train, y_train, model_folder, model_prefix, load_saved):
+    time_df = pd.DataFrame(index=models.keys(), columns=['train_time'])
 
     # train or load initialized models
     for key in models:
@@ -165,23 +158,76 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
     if ModelEnum.fnp.name in models:
         models[ModelEnum.fnp.name].choose_r(x_train, y_train)
 
-    pred_means, pred_vars, pred_vars_aleo, _, pred_times = predict_transform_multiple(models, x_test, scaler, offset_test=offset_test)
+    return models, time_df
+
+
+def models_predict_transform(models, x_test, scaler, offset_test=None):
+    time_df = pd.DataFrame(index=models.keys(), columns=['predict_time'])
+    pred_means, pred_vars, pred_vars_aleo, pred_vars_epis, pred_times = \
+        predict_transform_multiple(models, x_test, scaler, offset_test=offset_test)
     time_df.loc[:, 'predict_time'] = pred_times
 
-    pred_ood_vars = []
-    for x_ood in x_oods:
-        _, pred, _, _, _ = predict_transform_multiple(models, x_ood, scaler)
-        pred_ood_vars.append(pred)
+    return pred_means, pred_vars, pred_vars_aleo, pred_vars_epis, time_df
 
-    # convert times
-    time_df.loc[:, 'train_time'] = time_df.loc[:, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
-    time_df.loc[:, 'predict_time'] = time_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
 
-    # evaluate models (including plots and scores)
-    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars, result_folder, result_prefix,
-                                  generate_plots=generate_plots)
+def models_recalibrate(models, x_train, y_train_orig, scaler, offset_train):
+    recals = []
 
-    return pd.concat([time_df, scores_df], axis=1)
+    for k in models.keys():
+        model = models[k]
+        pred_mean, pred_var, _, _, _ = predict_transform(model, x_train, scaler, offset_train, k)
+        recal = recalibrate(pred_mean, pred_var, y_train_orig)
+
+        recals.append(recal)
+
+    return recals
+
+
+def models_post_process(pred_means, pred_vars, post_processors):
+    return tuple(zip(*[post_processor(pm, pv) for (pm, pv, post_processor) in zip(pred_means, pred_vars, post_processors)]))
+
+
+def eval_models(model_names, pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars,
+                result_folder, result_prefix, generate_plots=True):
+    scores_df = evaluate_multiple(model_names, pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars,
+                                  result_folder, result_prefix, generate_plots=generate_plots)
+
+    return scores_df
+
+
+def save_results(predict_time_df, score_df, result_folder, result_prefix, train_time_df=None):
+    if train_time_df is None:
+        # load train time
+        train_time_df = pd.read_csv(result_folder + result_prefix + 'train_time.csv', index_col=0)
+        result_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1)
+    else:
+        result_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1)
+        result_df.loc[:, 'train_time'] = result_df.loc[:, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
+        # save train time
+        result_df[['train_time']].to_csv(result_folder + result_prefix + 'train_time.csv')
+
+    result_df.loc[:, 'predict_time'] = result_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
+
+    # save result csv
+    result_df.to_csv(result_folder + result_prefix + 'results.csv', index_label='method')
+
+
+def generate_ood_data(test_df, x_test, short_term):
+    x_oods = []
+    # similar data to test set in dimensions of load and real indicator values
+    ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322)
+    x_ood_0, _, _ = dataset_df_to_np(ood_0_df)
+    x_oods.append(x_ood_0)
+    # very differenct ranges
+    ood_1_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=42, variation=4)
+    x_ood_1, _, _ = dataset_df_to_np(ood_1_df)
+    x_oods.append(x_ood_1)
+    # completely random (including indicator variables)
+    np.random.seed(492)
+    x_ood_2 = np.random.uniform(-2, 2, size=x_test.shape)
+    x_oods.append(x_ood_2)
+
+    return x_oods
 
 
 def init_train_eval_single(init_fn, x_train, y_train, x_test, offset_test, y_test_orig, x_ood, offset_ood, scaler, model_folder,

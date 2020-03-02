@@ -13,7 +13,7 @@ def plot_multiple(plot_fn, count, max_columns=3, sharey='row'):
 
         plot_fn(counter, ax)
 
-    for counter in range(count, rows * max_columns):
+    for counter in range(count, rows * min(count, max_columns)):
         ax = axes.reshape(-1)[counter]
         ax.set_axis_off()
 
