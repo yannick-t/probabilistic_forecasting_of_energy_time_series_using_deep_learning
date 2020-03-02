@@ -3,17 +3,16 @@ import torch
 from torch.distributions import Normal
 import numpy as np
 
+from evaluation.evaluateion_plot_util import plot_multiple
+
 
 def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true, pred_y_mean_comp=None, pred_y_var_comp=None):
     count = len(pred_y_mean)
-    max_columns = 3
-    rows = int(count / (max_columns + 1)) + 1
-    fig, axes = plt.subplots(rows, min(count, max_columns), sharey='row', figsize=(6, rows * 1.8))
-    for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
-        if count == 1:
-            ax = axes
-        else:
-            ax = axes[counter]
+
+    def plot_fn(counter, ax):
+        name = names[counter]
+        pmean = pred_y_mean[counter]
+        pvar = pred_y_var[counter]
 
         ax.set_title(name)
         if pred_y_var_comp is not None:
@@ -21,23 +20,24 @@ def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true, p
         else:
             probabilistic_calibration(pmean, pvar, y_true, ax)
 
+    fig = plot_multiple(plot_fn, count)
+
     fig.text(0.016, 0.5, 'Relative Frequency', va='center', rotation='vertical')
     plt.subplots_adjust(left=0.1)
 
 
 def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     count = len(pred_y_mean)
-    max_columns = 3
-    rows = int(count / (max_columns + 1)) + 1
-    fig, axes = plt.subplots(rows, min(count, max_columns), sharey='row', figsize=(6, rows * 1.8))
-    for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
-        if count == 1:
-            ax = axes
-        else:
-            ax = axes[counter]
+
+    def plot_fn(counter, ax):
+        name = names[counter]
+        pmean = pred_y_mean[counter]
+        pvar = pred_y_var[counter]
 
         ax.set_title(name)
         marginal_calibration(pmean, pvar, y_true, ax)
+
+    fig = plot_multiple(plot_fn, count)
 
     fig.text(0.014, 0.5, 'CDF Difference', va='center', rotation='vertical')
     plt.subplots_adjust(left=0.11)

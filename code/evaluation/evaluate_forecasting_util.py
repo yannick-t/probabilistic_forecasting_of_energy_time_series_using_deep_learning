@@ -36,7 +36,7 @@ def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, pred
             sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
             plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
 
-        # plt.show()
+        plt.show()
 
     scores = pd.DataFrame(index=names, columns=['90IntCov', '50IntCov', 'AvgCent50W', 'AvgCent90W', 'RMSE', 'MAPE',
                                                 'CRPS', 'AVGNLL'])

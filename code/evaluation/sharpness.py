@@ -4,6 +4,8 @@ from scipy.special import erfinv
 import numpy as np
 import pandas as pd
 
+from evaluation.evaluateion_plot_util import plot_multiple
+
 
 def sharpness_plot_multiple(names, pred_y_var):
     fig, ax = plt.subplots(figsize=(6, 3.0))
@@ -36,18 +38,16 @@ def sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
 
 def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars):
     count = len(names)
-    max_columns = 3
-    rows = int(count / (max_columns + 1)) + 1
-    fig, axes = plt.subplots(rows, min(count, max_columns), figsize=(6, rows * 1.8))
 
-    for counter, (name, p_test_var, p_ood_var) in enumerate(zip(names, pred_test_vars, pred_ood_vars)):
-        if count == 1:
-            ax = axes
-        else:
-            ax = axes[counter]
+    def plot_fn(counter, ax):
+        name = names[counter]
+        p_test_var = pred_test_vars[counter]
+        p_ood_var = pred_ood_vars[counter]
+
         ax.set_title(name)
-
         sharpness_plot_histogram_joint(p_test_var, p_ood_var, ax)
+
+    plot_multiple(plot_fn, count, sharey=False)
 
 
 def sharpness_plot_(pred_y_var, ax, names=None):
