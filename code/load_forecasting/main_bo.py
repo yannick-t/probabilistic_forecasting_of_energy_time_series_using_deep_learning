@@ -2,6 +2,7 @@ import torch
 from sklearn.model_selection import train_test_split
 from skopt.space import Real, Integer
 from skorch.callbacks import EarlyStopping, EpochTimer, ProgressBar
+from skorch.dataset import CVSplit
 
 from load_forecasting.forecast_util import dataset_df_to_np
 from models.concrete_dropout import ConcreteDropoutNN
@@ -36,35 +37,100 @@ def main():
     x_train, y_train, offset_train = dataset_df_to_np(train_df)
     x_test, y_test, offset_test = dataset_df_to_np(test_df)
 
-    print('Bayesian Optimization')
+    print('Optimization')
     print('OPSD ENTSOE-E Transparency')
     print('short term: %r' % short_term)
 
-    fnp_bo(x_train, y_train, x_test, y_test, short_term)
+    fnp_es(x_train, y_train, x_test, y_test, short_term)
 
 
-def deep_gp_bo(x_train, y_train, x_test, y_test):
+def fnp_es(x_train, y_train, x_test, y_test, short_term):
+    cv = 3
+    early_stopping = EarlyStopping(patience=250)
+    if short_term:
+        hs_enc = [24, 64]
+        hs_dec = [32]
+        dim_u = 2
+        dim_z = 32
+        fb_z = 1.0
+    else:
+        hs_enc = [132, 77]
+        hs_dec = [50]
+        dim_u = 9
+        dim_z = 32
+        fb_z = 1.0
+    print(hs_enc)
+    print(hs_dec)
+    print('Functional Neural Processes')
+    fnp = RegressionFNPSkorch(
+        module=RegressionFNP,
+        module__dim_x=x_train.shape[-1],
+        module__dim_y=y_train.shape[-1],
+        module__hidden_size_enc=hs_enc,
+        module__hidden_size_dec=hs_dec,
+        train_split=None,
+        optimizer=torch.optim.Adam,
+        device=device,
+        train_size=x_train.shape[0],
+        module__dim_u=dim_u,
+        module__dim_z=dim_z,
+        module__fb_z=fb_z,
+        lr=0.001,
+        reference_set_size_ratio=0.003,
+        max_epochs=3500,
+        batch_size=1024,
+        verbose=1,
+        # callbacks=[early_stopping]
+    )
+
+    fnp.fit(x_train, y_train)
+
+
+def deep_gp_es(x_train, y_train, x_test, y_test, short_term):
+    print('Deep GP Early Stopping')
+    early_stopping = EarlyStopping(patience=250)
+    dgp = DeepGPSkorch(
+        module=DeepGaussianProcess,
+        module__input_size=x_train.shape[-1],
+        module__hidden_size=[3],
+        module__output_size=y_train.shape[-1] * 2,
+        module__num_inducing=128,
+        lr=0.01,
+        max_epochs=3500,
+        batch_size=1024,
+        train_split=CVSplit(3),
+        verbose=1,
+        optimizer=torch.optim.Adam,
+        num_data=x_train.shape[0],
+        device=device,
+        callbacks=[early_stopping]
+    )
+
+    dgp.fit(x_train, y_train)
+
+
+def deep_gp_bo(x_train, y_train, x_test, y_test, short_term):
     print('Deep GP')
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
         module__num_inducing=128,
-        max_epochs=40,
+        max_epochs=200,
         batch_size=1024,
         train_split=None,
         optimizer=torch.optim.Adam,
         num_data=x_train.shape[0],
         device=device)
 
-    space = {# 'lr': Real(0.001, 0.03, 'log-uniform'),
-             'module__hidden_size_0': Integer(1, 4),
+    space = {'lr': Real(0.001, 0.1, 'log-uniform'),
+             'module__hidden_size_0': Integer(2, 4),
              # 'module__hidden_size_1': Integer(1, 8),
              # 'module__hidden_size_2': Integer(1, 4),
              # 'module__num_inducing': Integer(16, 512),
              }
 
-    bayesian_optimization(dgp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=4,
+    bayesian_optimization(dgp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=12,
                           n_jobs=1, cv=3)  # workaround for pickling error of gpytorch stuff, can't run prallel
 
 
@@ -149,14 +215,20 @@ def deep_ens_bo(x_train, y_train, x_test, y_test, short_term):
 
 def fnp_bo(x_train, y_train, x_test, y_test, short_term):
     progress_bar_ep = ProgressBar()
-    early_stopping = EarlyStopping(monitor='train_loss', patience=8)
+    early_stopping = EarlyStopping(monitor='train_loss', patience=20)
     cv = 3
     if short_term:
         hs_enc = [24, 64]
         hs_dec = [32]
+        dim_u = 2
+        dim_z = 32
+        fb_z = 1.0
     else:
         hs_enc = [132, 77]
         hs_dec = [50]
+        dim_u = 9
+        dim_z = 32
+        fb_z = 1.0
     print(hs_enc)
     print(hs_dec)
     print('Functional Neural Processes')
@@ -170,32 +242,32 @@ def fnp_bo(x_train, y_train, x_test, y_test, short_term):
         optimizer=torch.optim.Adam,
         device=device,
         train_size=int((1 - 1 / cv) * x_train.shape[0]),
-        module__dim_u=3,
-        module__dim_z=50,
-        module__fb_z=2.0,
+        module__dim_u=dim_u,
+        module__dim_z=dim_z,
+        module__fb_z=fb_z,
         lr=0.001,
-        reference_set_size_ratio=0.08,
-        max_epochs=8,
+        reference_set_size_ratio=0.003,
+        max_epochs=60,
         batch_size=1024,
         verbose=1,
-        callbacks=[progress_bar_ep, early_stopping]
+        callbacks=[early_stopping]
     )
 
     space = {
         # 'lr': Real(0.001, 0.01, 'log-uniform'),
         # 'max_epochs': Integer(1, 100),
         # 'batch_size': [32, 64, 128],
-        'module__dim_u': Integer(1, 12),
-        'module__dim_z': Integer(8, 128),
-        'module__fb_z': Real(0, 2.4),
-        # 'reference_set_size_ratio': Real(0.01, 0.4),
+        # 'module__dim_u': Integer(1, 9),
+        # 'module__dim_z': Integer(8, 70),
+        # 'module__fb_z': Real(0, 2.4),
+        'reference_set_size_ratio': Real(0.0001, 0.003),
         # 'module__hidden_size_enc_0': Integer(1, 256),
         # 'module__hidden_size_enc_1': Integer(1, 256),
         # 'module__hidden_size_dec_0': Integer(1, 256),
         # 'module__hidden_size_dec_1': Integer(1, 256),
     }
 
-    bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=24, cv=cv, n_jobs=2)
+    bayesian_optimization(fnp, space, crps_scorer, x_train, y_train, x_test, y_test, n_iter=28, cv=cv, n_jobs=2)
 
 
 def concrete_bo(x_train, y_train, x_test, y_test, short_term):
