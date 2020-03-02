@@ -17,25 +17,26 @@ names_pretty_dict = {ModelEnum.simple_nn_aleo.name: 'Simple NN', ModelEnum.concr
                      ModelEnum.quantile_reg.name: 'Quantile Regression'}
 
 
-def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, pred_ood_vars, result_folder, result_prefix):
+def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, pred_ood_vars, result_folder, result_prefix, generate_plots=True):
     names_pretty = [names_pretty_dict[name] for name in names]
 
-    # calibration
-    probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y, pred_means, pred_vars_aleo)
-    plt.savefig(result_folder + result_prefix + 'calibration_probabilistic.pdf')
-    marginal_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
-    plt.savefig(result_folder + result_prefix + 'calibration_marginal.pdf')
+    if generate_plots:
+        # calibration
+        probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y, pred_means, pred_vars_aleo)
+        plt.savefig(result_folder + result_prefix + 'calibration_probabilistic.pdf')
+        marginal_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
+        plt.savefig(result_folder + result_prefix + 'calibration_marginal.pdf')
 
-    # sharpness
-    sharpness_plot_multiple(names_pretty, pred_vars)
-    plt.savefig(result_folder + result_prefix + 'calibration_sharpness.pdf')
+        # sharpness
+        sharpness_plot_multiple(names_pretty, pred_vars)
+        plt.savefig(result_folder + result_prefix + 'calibration_sharpness.pdf')
 
-    # epistemic out of distribution evaluation
-    for counter, p_ood in enumerate(pred_ood_vars):
-        sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
-        plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
+        # epistemic out of distribution evaluation
+        for counter, p_ood in enumerate(pred_ood_vars):
+            sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
+            plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
 
-    # plt.show()
+        # plt.show()
 
     scores = pd.DataFrame(index=names, columns=['90IntCov', '50IntCov', 'AvgCent50W', 'AvgCent90W', 'RMSE', 'MAPE',
                                                 'CRPS', 'AVGNLL'])

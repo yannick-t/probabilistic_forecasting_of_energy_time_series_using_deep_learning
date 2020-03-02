@@ -2,6 +2,8 @@
 # Simple and scalable predictive uncertainty estimation using deep ensembles.
 # In Advances in neural information processing systems (pp. 6402-6413).
 # using a custom sklean estimator to train an ensemble of neural nets
+import multiprocessing
+
 import sklearn
 import numpy as np
 import torch
@@ -58,6 +60,8 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
         # fit each with shuffled copies of the training data separately
         # according to original paper
         args = [(model, X, y) for model in self.models]
+
+        multiprocessing.set_start_method('spawn', force=True)
 
         if self.parallel:
             pool = Pool(self.ensemble_size)

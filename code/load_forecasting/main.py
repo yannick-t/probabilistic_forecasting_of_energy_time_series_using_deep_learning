@@ -37,25 +37,25 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 
 def main():
-    short_term = True
-
     # trained model location and prefix
     model_folder = '../trained_models/'
     prefix = 'load_forecasting_'
     result_folder = '../results/'
 
-    # models = [ModelEnum.linear_reg, ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
-    #            ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    # models = [ModelEnum.quantile_reg]
-    models = None  # all
+    models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
+               ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
+    # models = [ModelEnum.quantile_reg, ModelEnum.linear_reg]
 
     # Forecasting case with short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=True, models=models, load_saved_models=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=True, models=models, load_saved_models=False,
+                    generate_plots=False)
     # Forecasting case without short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=False, models=models, load_saved_models=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, models=models, load_saved_models=False,
+                    generate_plots=False)
 
 
-def evaluate_models(model_folder, prefix, result_folder, short_term, models=None, load_saved_models=False, crps_loss=False):
+def evaluate_models(model_folder, prefix, result_folder, short_term, models=None, load_saved_models=False,
+                    crps_loss=False, generate_plots=True):
     # evaluate given models fot the thesis, training with found hyper parameters
     # (initialization with parameters is located in the init method for each method)
     # default to all models
@@ -101,7 +101,8 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, models=None
     # initialize and evaluate all methods, train and save if load_saved_models is false
     result_df = init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oods, scaler,
                                     model_folder, model_prefix, result_prefix, result_folder, short_term,
-                                    load_saved=load_saved_models, model_names=models, crps=crps_loss)
+                                    load_saved=load_saved_models, model_names=models, crps=crps_loss,
+                                    generate_plots=generate_plots)
 
     # save result csv
     if not load_saved_models:
@@ -115,7 +116,8 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, models=None
 
 
 def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oods, scaler, model_folder,
-                        model_prefix, result_prefix, result_folder, short_term, load_saved=False, model_names=None, crps=False):
+                        model_prefix, result_prefix, result_folder, short_term, load_saved=False, model_names=None,
+                        crps=False, generate_plots=True):
     if model_names is None:
         model_names = [n for n in ModelEnum]
     models = {}
@@ -176,7 +178,8 @@ def init_train_eval_all(x_train, y_train, x_test, offset_test, y_test_orig, x_oo
     time_df.loc[:, 'predict_time'] = time_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
 
     # evaluate models (including plots and scores)
-    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars, result_folder, result_prefix)
+    scores_df = evaluate_multiple(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars, result_folder, result_prefix,
+                                  generate_plots=generate_plots)
 
     return pd.concat([time_df, scores_df], axis=1)
 
@@ -330,14 +333,14 @@ def fnp_init(x_train, y_train, short_term):
     es = EarlyStopping(monitor='crps', patience=100)
 
     if short_term:
-        epochs = 1000
+        epochs = 300
         hs_enc = [24, 64]
         hs_dec = [32]
         dim_u = 2
         dim_z = 32
         fb_z = 1.0
     else:
-        epochs = 1000
+        epochs = 300
         hs_enc = [132, 77]
         hs_dec = [50]
         dim_u = 9
@@ -363,7 +366,7 @@ def fnp_init(x_train, y_train, short_term):
         train_size=x_train.size,
         train_split=None,
         verbose=1,
-        callbacks=[scorer, es]
+        # callbacks=[scorer, es]
     )
 
     return fnp
