@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from torch.distributions import Normal
 
+from training.loss.torch_loss_fns import bnll
+
 
 class HeteroscedasticLoss(nn.Module):
     def __init__(self):
@@ -23,8 +25,6 @@ class HeteroscedasticLoss(nn.Module):
         softplus = torch.nn.Softplus()
         std = softplus(std)
 
-        # bayesian nll
-        dist = Normal(mean, std)
-        loss = (-dist.log_prob(target)).mean(0)
+        loss = bnll(mean, std, target)
 
         return loss

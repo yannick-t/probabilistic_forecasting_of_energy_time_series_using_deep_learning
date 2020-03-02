@@ -26,9 +26,9 @@ def sharpness_plot_histogram(pred_y_var, ax):
 
 
 def sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
-    sns.kdeplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', cut=0, bw=0.4)
+    sns.kdeplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', cut=0)
     sns.rugplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', height=0.025)
-    sns.kdeplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue', shade=True, cut=0, bw=0.4)
+    sns.kdeplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue', shade=True, cut=0)
     sns.rugplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue')
     ax.set_yticklabels([])
     ax.margins(0, 0.06)
@@ -36,7 +36,9 @@ def sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
 
 def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars):
     count = len(names)
-    fig, axes = plt.subplots(1, count, figsize=(6, 1.8))
+    max_columns = 3
+    rows = int(count / (max_columns + 1)) + 1
+    fig, axes = plt.subplots(rows, min(count, max_columns), figsize=(6, rows * 1.8))
 
     for counter, (name, p_test_var, p_ood_var) in enumerate(zip(names, pred_test_vars, pred_ood_vars)):
         ax = axes[counter]
@@ -45,7 +47,7 @@ def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars
         sharpness_plot_histogram_joint(p_test_var, p_ood_var, ax)
 
 
-def sharpness_plot_(pred_y_var, ax, names=None, scaler=None):
+def sharpness_plot_(pred_y_var, ax, names=None):
     quantiles = [0.5, 0.9]
 
     pred_y_var = np.array(pred_y_var)

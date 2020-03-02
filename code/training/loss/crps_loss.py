@@ -3,6 +3,8 @@ from torch import nn
 import numpy as np
 from torch.distributions import Normal
 
+from training.loss.torch_loss_fns import crps
+
 
 class CRPSLoss(nn.Module):
     def __init__(self):
@@ -25,22 +27,4 @@ class CRPSLoss(nn.Module):
         softplus = torch.nn.Softplus()
         sigma = softplus(sigma)
 
-        # crps
-        # Gneiting, T., Raftery, A. E., Westveld III, A. H., & Goldman, T. (2005).
-        # Calibrated probabilistic forecasting using ensemble model output statistics and minimum CRPS estimation.
-        # Monthly Weather Review, 133(5), 1098-1118.
-        # Formula 5
-        sx = (target - mu) / sigma
-
-        normal = Normal(torch.Tensor([0]).to(preds.device),
-                        torch.Tensor([1]).to(preds.device))
-        pdf = normal.log_prob(sx).exp()
-        cdf = normal.cdf(sx)
-
-        assert pdf.shape == cdf.shape == sx.shape == target.shape
-
-        crps = sigma * (sx * (2 * cdf - 1) + 2 * pdf - self.const.to(preds.device))
-
-        assert crps.shape == target.shape
-
-        return crps.mean(0)
+        return crps(mu, sigma, target)

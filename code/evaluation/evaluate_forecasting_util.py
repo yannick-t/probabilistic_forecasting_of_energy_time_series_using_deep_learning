@@ -1,22 +1,27 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
 from evaluation.calibration import probabilistic_calibration_multiple, marginal_calibration_multiple, interval_coverage, \
     probabilistic_calibration, marginal_calibration
 from evaluation.scoring import rmse, mape, crps, log_likelihood
 from evaluation.sharpness import sharpness_plot_multiple, sharpness_plot_histogram_joint_multiple, sharpness_avg_width, \
-    sharpness_plot, sharpness_plot_histogram, sharpness_plot_histogram_joint
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
+    sharpness_plot, sharpness_plot_histogram_joint
+from util.model_enum import ModelEnum
 
-names_pretty_dict = {'simple_nn_aleo': 'Simple NN', 'concrete': 'Concrete', 'fnp': 'FNP', 'deep_ens': 'Deep Ens.',
-                     'bnn': 'BNN', 'dgp': 'Deep GP', 'linear_reg': 'Linear Regression', 'gp': 'Simple Gaussian Process',
-                     'quantile_reg': 'Quantile Regression'}
+# pretty names for plot titles etc.
+names_pretty_dict = {ModelEnum.simple_nn_aleo.name: 'Simple NN', ModelEnum.concrete.name: 'Concrete',
+                     ModelEnum.fnp.name: 'FNP',
+                     ModelEnum.deep_ens.name: 'Deep Ens.', ModelEnum.bnn.name: 'BNN', ModelEnum.dgp.name: 'Deep GP',
+                     ModelEnum.linear_reg.name: 'Linear Regression',
+                     ModelEnum.quantile_reg.name: 'Quantile Regression'}
 
 
-def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars, result_folder, result_prefix):
+def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, pred_ood_vars, result_folder, result_prefix):
     names_pretty = [names_pretty_dict[name] for name in names]
 
     # calibration
-    probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
+    probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y, pred_means, pred_vars_aleo)
     plt.savefig(result_folder + result_prefix + 'calibration_probabilistic.pdf')
     marginal_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
     plt.savefig(result_folder + result_prefix + 'calibration_marginal.pdf')
@@ -26,8 +31,9 @@ def evaluate_multiple(names, pred_means, pred_vars, true_y, pred_ood_vars, resul
     plt.savefig(result_folder + result_prefix + 'calibration_sharpness.pdf')
 
     # epistemic out of distribution evaluation
-    sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, pred_ood_vars)
-    plt.savefig(result_folder + result_prefix + 'sharpness_ood.pdf')
+    for counter, p_ood in enumerate(pred_ood_vars):
+        sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
+        plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
 
     plt.show()
 
@@ -120,8 +126,6 @@ def evaluate_multi_step(pred_df, y_test, offset_test, scaler):
     print('Multi-Step:')
     print("RMSE: %.4f" % rmses.mean())
     print("MAPE: %.2f" % mapes.mean())
-
-
 
 
 def plot_test_data(pred_mean, pred_var, y_true, timestamp, ax):

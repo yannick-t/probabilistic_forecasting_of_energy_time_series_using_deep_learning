@@ -4,20 +4,27 @@ from torch.distributions import Normal
 import numpy as np
 
 
-def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
+def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true, pred_y_mean_comp=None, pred_y_var_comp=None):
     count = len(pred_y_mean)
-    fig, axes = plt.subplots(1, count, sharey='row', figsize=(6, 1.8))
+    max_columns = 3
+    rows = int(count / (max_columns + 1)) + 1
+    fig, axes = plt.subplots(rows, min(count, max_columns), sharey='row', figsize=(6, rows * 1.8))
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
         ax = axes[counter]
         ax.set_title(name)
-        probabilistic_calibration(pmean, pvar, y_true, ax)
+        if pred_y_var_comp is not None:
+            probabilistic_calibration(pmean, pvar, y_true, ax, pred_y_mean_comp[counter], pred_y_var_comp[counter])
+        else:
+            probabilistic_calibration(pmean, pvar, y_true, ax)
     fig.text(0.016, 0.5, 'Relative Frequency', va='center', rotation='vertical')
     plt.subplots_adjust(left=0.1)
 
 
 def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     count = len(pred_y_mean)
-    fig, axes = plt.subplots(1, count, sharey='row', figsize=(6, 1.8))
+    max_columns = 3
+    rows = int(count / (max_columns + 1)) + 1
+    fig, axes = plt.subplots(rows, min(count, max_columns), sharey='row', figsize=(6, rows * 1.8))
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
         ax = axes[counter]
         ax.set_title(name)
@@ -27,27 +34,35 @@ def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     plt.subplots_adjust(left=0.11)
 
 
-def probabilistic_calibration(pred_y_mean, pred_y_var, y_true, ax):
+def probabilistic_calibration(pred_y_mean, pred_y_var, y_true, ax, pred_y_mean_comp=None, pred_y_var_comp=None):
 
     # evaluate probabilistic calibration with PIT histogram
     n_bins = 20
 
-    mean = torch.Tensor(pred_y_mean).cpu().squeeze()
-    var = torch.Tensor(pred_y_var).cpu().squeeze()
-    y = torch.Tensor(y_true).cpu().squeeze()
-
-    dist = Normal(mean, var.sqrt())
-    pt = dist.cdf(y)
-
-    pt = pt.squeeze().numpy()
-
+    pt = pit_calc(pred_y_mean, pred_y_var, y_true)
     ax.hist(pt, n_bins, color='lightblue', density=True, weights=np.zeros_like(pt) + 1. / pt.size, rwidth=0.9)
+    if pred_y_var_comp is not None:
+        pt1 = pit_calc(pred_y_mean_comp, pred_y_var_comp, y_true)
+        ax.hist(pt1, n_bins, color='orange', alpha=0.2, density=True, weights=np.zeros_like(pt1) + 1. / pt1.size, rwidth=0.9)
 
     # 1 line
     px = np.arange(0, 1, 0.01)
     ax.plot(px, np.repeat(1, px.shape), color='lightgray', linestyle="--", alpha=0.75)
 
     ax.margins(0, 0.06)
+
+
+def pit_calc(means, vars, targets):
+    mean = torch.Tensor(means).cpu().squeeze()
+    var = torch.Tensor(vars).cpu().squeeze()
+    y = torch.Tensor(targets).cpu().squeeze()
+
+    dist = Normal(mean, var.sqrt())
+    pt = dist.cdf(y)
+
+    pt = pt.squeeze().numpy()
+
+    return pt
 
 
 def interval_coverage(pred_y_mean, pred_y_var, y_true, interval):
