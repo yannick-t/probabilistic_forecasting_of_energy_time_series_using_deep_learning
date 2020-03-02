@@ -5,7 +5,7 @@ import numpy as np
 crps_const = 1 / torch.Tensor([np.pi]).sqrt()
 
 
-def crps(mean, std, target):
+def crps_torch(mean, std, target):
     # crps
     # Gneiting, T., Raftery, A. E., Westveld III, A. H., & Goldman, T. (2005).
     # Calibrated probabilistic forecasting using ensemble model output statistics and minimum CRPS estimation.

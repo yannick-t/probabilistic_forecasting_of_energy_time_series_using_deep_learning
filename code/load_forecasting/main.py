@@ -4,9 +4,10 @@ import pandas as pd
 import statsmodels.api as sm
 import numpy as np
 import torch
-from skorch.callbacks import EarlyStopping
+from skorch.callbacks import EarlyStopping, EpochScoring
 
 from evaluation.evaluate_forecasting_util import evaluate_multiple, evaluate_single
+from evaluation.scoring import crps
 from load_forecasting.forecast_util import dataset_df_to_np
 from load_forecasting.predict import predict_transform_multiple, predict_transform
 from models.concrete_dropout import ConcreteDropoutNN
@@ -23,7 +24,7 @@ from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from models.torch_bnn import TorchBNN
 from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
-from training.loss.torch_loss_fns import crps, bnll
+from training.loss.torch_loss_fns import crps_torch, bnll
 from training.training_util import load_train
 from util.data.data_src_tools import load_opsd_de_load_dataset
 from util.data.data_tools import gen_synth_ood_data_like
@@ -44,10 +45,14 @@ def main():
     result_folder = '../results/'
 
     # models = [ModelEnum.linear_reg, ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
-    #           ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete]
+    #            ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
+    # models = [ModelEnum.quantile_reg]
+    models = None  # all
 
-    evaluate_models(model_folder, prefix, result_folder, short_term, models, load_saved_models=True)
+    # Forecasting case with short term lagged vars
+    evaluate_models(model_folder, prefix, result_folder, short_term=True, models=models, load_saved_models=False)
+    # Forecasting case without short term lagged vars
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, models=models, load_saved_models=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, models=None, load_saved_models=False, crps_loss=False):
@@ -212,17 +217,22 @@ def simple_aleo_nn_init(x_train, y_train, short_term, crps_loss=False):
 
     if short_term:
         hs = [24, 64, 32]
+        lr = 0.0005
+        epochs = 3500
     else:
         hs = [132, 77, 50]
+        lr = 5e-05
+        epochs = 1253
+
     es = EarlyStopping(patience=75)
     simple_nn = AleatoricNNSkorch(
         module=SimpleNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
         module__hidden_size=hs,
-        lr=0.0015,
+        lr=lr,
         batch_size=1024,
-        max_epochs=100,
+        max_epochs=epochs,
         train_split=None,
         optimizer=torch.optim.Adam,
         criterion=loss,
@@ -236,18 +246,27 @@ def simple_aleo_nn_init(x_train, y_train, short_term, crps_loss=False):
 
 def deep_gp_init(x_train, y_train, short_term, crps_loss=False):
     if crps_loss:
-        loss = crps
+        loss = crps_torch
     else:
         loss = bnll
+
+    if short_term:
+        epochs = 600
+        lr = 0.0015
+        hs = [4]
+    else:
+        epochs = 600
+        lr = 0.0015
+        hs = [4]
 
     dgp = DeepGPSkorch(
         module=DeepGaussianProcess,
         module__input_size=x_train.shape[-1],
-        module__hidden_size=[2],
+        module__hidden_size=hs,
         module__output_size=y_train.shape[-1] * 2,
         module__num_inducing=128,
-        lr=0.001,
-        max_epochs=20,
+        lr=lr,
+        max_epochs=epochs,
         batch_size=1024,
         train_split=None,
         verbose=1,
@@ -270,10 +289,14 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
         hs = [24, 64, 32]
         prior_mu = 0
         prior_sigma = 0.1
+        lr = 0.000182
+        epochs = 3306
     else:
         hs = [132, 77, 50]
         prior_mu = -5
         prior_sigma = 0.1
+        lr = 0.000423
+        epochs = 3430
 
     bnn = BNNSkorch(
         module=TorchBNN,
@@ -283,8 +306,8 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
         module__prior_mu=prior_mu,
         module__prior_sigma=prior_sigma,
         sample_count=30,
-        lr=0.001,
-        max_epochs=100,
+        lr=lr,
+        max_epochs=epochs,
         train_split=None,
         verbose=1,
         batch_size=1024,
@@ -296,26 +319,51 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
 
 
 def fnp_init(x_train, y_train, short_term):
+    # Early Stopping when crps does not improve
+    # (fnp can get worse if trained too long)
+    def scoring(model, X, y):
+        y_pred = model.predict(X.X['XM'], samples=5)
+        score = crps(y_pred[..., 0], np.sqrt(y_pred[..., 1]), y)
+        return score
+
+    scorer = EpochScoring(scoring, on_train=True, name='crps')
+    es = EarlyStopping(monitor='crps', patience=100)
+
+    if short_term:
+        epochs = 1000
+        hs_enc = [24, 64]
+        hs_dec = [32]
+        dim_u = 2
+        dim_z = 32
+        fb_z = 1.0
+    else:
+        epochs = 1000
+        hs_enc = [132, 77]
+        hs_dec = [50]
+        dim_u = 9
+        dim_z = 32
+        fb_z = 1.0
 
     fnp = RegressionFNPSkorch(
         module=RegressionFNP,
         module__dim_x=x_train.shape[-1],
         module__dim_y=y_train.shape[-1],
-        module__hidden_size_enc=[32],
-        module__hidden_size_dec=[32],
+        module__hidden_size_enc=hs_enc,
+        module__hidden_size_dec=hs_dec,
         optimizer=torch.optim.Adam,
         device=device,
         seed=42,
-        module__dim_u=3,
-        module__dim_z=50,
-        module__fb_z=1.0,
+        module__dim_u=dim_u,
+        module__dim_z=dim_z,
+        module__fb_z=fb_z,
         lr=0.001,
-        reference_set_size_ratio=0.05,
-        max_epochs=5,
+        reference_set_size_ratio=0.003,
+        max_epochs=epochs,
         batch_size=1024,
         train_size=x_train.size,
         train_split=None,
-        verbose=1
+        verbose=1,
+        callbacks=[scorer, es]
     )
 
     return fnp
@@ -330,15 +378,19 @@ def deep_ensemble_init(x_train, y_train, short_term, crps_loss=False):
     # paramters found through hyperparameter optimization
     if short_term:
         hs = [24, 64, 32]
+        lr = 0.0005
+        epochs = 3500
     else:
         hs = [132, 77, 50]
+        lr = 5.026324529403299e-05
+        epochs = 1253
 
     ensemble_model = DeepEnsemble(
         input_size=x_train.shape[-1],
         output_size=y_train.shape[-1] * 2,
         hidden_size=hs,
-        lr=0.001,
-        max_epochs=3000,
+        lr=lr,
+        max_epochs=epochs,
         batch_size=1024,
         optimizer=torch.optim.Adam,
         criterion=loss,
@@ -357,21 +409,27 @@ def concrete_init(x_train, y_train, short_term, crps_loss=False):
     # paramters found through hyperparameter optimization
     if short_term:
         hs = [24, 64, 32]
+        lr = 0.00051
+        epochs = 3400
+        lengthscale = 1e-9
     else:
         hs = [132, 77, 50]
+        lr = 0.0001
+        epochs = 271
+        lengthscale = 1e-9
 
     concrete_model = ConcreteSkorch(
         module=ConcreteDropoutNN,
         module__input_size=x_train.shape[-1],
         module__output_size=y_train.shape[-1] * 2,
         module__hidden_size=hs,
-        lengthscale=1e-4,
+        lengthscale=lengthscale,
         dataset_size=x_train.shape[0],
         sample_count=30,
-        lr=0.0015,
+        lr=lr,
         train_split=None,
         verbose=1,
-        max_epochs=108,
+        max_epochs=epochs,
         batch_size=1024,
         optimizer=torch.optim.Adam,
         criterion=loss,

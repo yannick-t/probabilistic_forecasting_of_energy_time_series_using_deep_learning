@@ -41,7 +41,10 @@ def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars
     fig, axes = plt.subplots(rows, min(count, max_columns), figsize=(6, rows * 1.8))
 
     for counter, (name, p_test_var, p_ood_var) in enumerate(zip(names, pred_test_vars, pred_ood_vars)):
-        ax = axes[counter]
+        if count == 1:
+            ax = axes
+        else:
+            ax = axes[counter]
         ax.set_title(name)
 
         sharpness_plot_histogram_joint(p_test_var, p_ood_var, ax)

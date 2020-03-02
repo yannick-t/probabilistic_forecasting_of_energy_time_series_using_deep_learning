@@ -35,7 +35,7 @@ class RegressionFNPSkorch(BaseNNSkorch):
 
         return idx_r
 
-    def predict(self, X):
+    def predict(self, X, samples=30):
         self.module_.eval()
 
         output_size = self.module__dim_y

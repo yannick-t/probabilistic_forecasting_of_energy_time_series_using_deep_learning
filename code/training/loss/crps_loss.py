@@ -3,7 +3,7 @@ from torch import nn
 import numpy as np
 from torch.distributions import Normal
 
-from training.loss.torch_loss_fns import crps
+from training.loss.torch_loss_fns import crps_torch
 
 
 class CRPSLoss(nn.Module):
@@ -27,4 +27,4 @@ class CRPSLoss(nn.Module):
         softplus = torch.nn.Softplus()
         sigma = softplus(sigma)
 
-        return crps(mu, sigma, target)
+        return crps_torch(mu, sigma, target)

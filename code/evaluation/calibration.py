@@ -10,12 +10,17 @@ def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true, p
     rows = int(count / (max_columns + 1)) + 1
     fig, axes = plt.subplots(rows, min(count, max_columns), sharey='row', figsize=(6, rows * 1.8))
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
-        ax = axes[counter]
+        if count == 1:
+            ax = axes
+        else:
+            ax = axes[counter]
+
         ax.set_title(name)
         if pred_y_var_comp is not None:
             probabilistic_calibration(pmean, pvar, y_true, ax, pred_y_mean_comp[counter], pred_y_var_comp[counter])
         else:
             probabilistic_calibration(pmean, pvar, y_true, ax)
+
     fig.text(0.016, 0.5, 'Relative Frequency', va='center', rotation='vertical')
     plt.subplots_adjust(left=0.1)
 
@@ -26,10 +31,14 @@ def marginal_calibration_multiple(names, pred_y_mean, pred_y_var, y_true):
     rows = int(count / (max_columns + 1)) + 1
     fig, axes = plt.subplots(rows, min(count, max_columns), sharey='row', figsize=(6, rows * 1.8))
     for counter, (name, pmean, pvar) in enumerate(zip(names, pred_y_mean, pred_y_var)):
-        ax = axes[counter]
-        ax.set_title(name)
+        if count == 1:
+            ax = axes
+        else:
+            ax = axes[counter]
 
+        ax.set_title(name)
         marginal_calibration(pmean, pvar, y_true, ax)
+
     fig.text(0.014, 0.5, 'CDF Difference', va='center', rotation='vertical')
     plt.subplots_adjust(left=0.11)
 
