@@ -1,3 +1,4 @@
+import os
 import time
 
 import pandas as pd
@@ -66,11 +67,11 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
         prefix = prefix + 'short_term_'
     if crps_loss:
         prefix = prefix + 'crps_'
-    model_prefix = prefix
+
     if model_names is not None:
-        result_prefix = prefix + '_'.join([m.name for m in model_names]) + '_'
+        plot_prefix = prefix + '_'.join([m.name for m in model_names]) + '_'
     else:
-        result_prefix = prefix + 'all_'
+        plot_prefix = prefix + 'all_'
 
     # load / preprocess dataset if needed
     train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False,
@@ -89,7 +90,7 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
 
     # initialize and evaluate all methods, train and save if load_saved_models is false
     models = init_models(x_train, y_train, short_term, model_names)
-    models, train_times = train_load_models(models, x_train, y_train, model_folder, model_names, load_saved_models)
+    models, train_times = train_load_models(models, x_train, y_train, model_folder, prefix, load_saved_models)
     if load_saved_models:
         train_times = None
 
@@ -102,8 +103,8 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
         pred_means, pred_vars = models_post_process(pred_means, pred_vars, recals)
         pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recals)[1] for pred_ood_m, pred_ood_v in zip(pred_ood_means, pred_ood_vars)]
 
-    scores = eval_models(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars, result_folder, result_prefix, generate_plots)
-    save_results(predict_times, scores, result_folder, result_prefix, train_time_df=train_times)
+    scores = eval_models(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars, result_folder, plot_prefix, generate_plots)
+    save_results(predict_times, scores, result_folder, prefix, train_time_df=train_times)
 
 
 def init_models(x_train, y_train, short_term, model_names=None, crps=False):
@@ -196,17 +197,28 @@ def eval_models(model_names, pred_means, pred_vars, pred_vars_aleo, y_test_orig,
 
 
 def save_results(predict_time_df, score_df, result_folder, result_prefix, train_time_df=None):
-    if train_time_df is None:
-        # load train time
-        train_time_df = pd.read_csv(result_folder + result_prefix + 'train_time.csv', index_col=0)
-        result_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1)
-    else:
-        result_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1)
-        result_df.loc[:, 'train_time'] = result_df.loc[:, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
-        # save train time
-        result_df[['train_time']].to_csv(result_folder + result_prefix + 'train_time.csv')
+    # convert times
+    if train_time_df is not None:
+        train_time_df.loc[:, 'train_time'] = train_time_df.loc[:, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
+    predict_time_df.loc[:, 'predict_time'] = predict_time_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
 
-    result_df.loc[:, 'predict_time'] = result_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
+    # load results df and append results if available
+    path = result_folder + result_prefix + 'train_time.csv'
+    if os.path.exists(path):
+        result_df = pd.read_csv(path, index_col=0)
+
+        if train_time_df is not None:
+            new_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1)
+        else:
+            new_df = pd.concat([predict_time_df, score_df], axis=1)
+
+        # update df with results
+        result_df = new_df.combine_first(result_df)
+    else:
+        if train_time_df is None:
+            print('No train time available to save, will be nan')
+            train_time_df = pd.DataFrame(np.nan, index=predict_time_df.index, columns='train_time')
+        result_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1)
 
     # save result csv
     result_df.to_csv(result_folder + result_prefix + 'results.csv', index_label='method')
