@@ -13,8 +13,8 @@ from util.model_enum import ModelEnum
 names_pretty_dict = {ModelEnum.simple_nn_aleo.name: 'Simple NN', ModelEnum.concrete.name: 'Concrete',
                      ModelEnum.fnp.name: 'FNP',
                      ModelEnum.deep_ens.name: 'Deep Ens.', ModelEnum.bnn.name: 'BNN', ModelEnum.dgp.name: 'Deep GP',
-                     ModelEnum.linear_reg.name: 'Linear Regression',
-                     ModelEnum.quantile_reg.name: 'Quantile Regression'}
+                     ModelEnum.linear_reg.name: 'Linear Regr.',
+                     ModelEnum.quantile_reg.name: 'Quantile Regr.'}
 
 
 def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, pred_ood_vars, result_folder, result_prefix, generate_plots=True):

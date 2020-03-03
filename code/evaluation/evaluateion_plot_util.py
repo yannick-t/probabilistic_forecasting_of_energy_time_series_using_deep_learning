@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
+import math
 
 
-def plot_multiple(plot_fn, count, max_columns=3, sharey='row'):
-    rows = int(count / (max_columns + 1)) + 1
+def plot_multiple(plot_fn, count, max_columns=4, sharey='all'):
+    rows = math.ceil(count / max_columns)
     fig, axes = plt.subplots(rows, min(count, max_columns), sharey=sharey, figsize=(6, rows * 1.8))
 
     for counter in range(count):

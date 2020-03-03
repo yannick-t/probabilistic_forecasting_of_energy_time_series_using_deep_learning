@@ -59,6 +59,8 @@ def probabilistic_calibration(pred_y_mean, pred_y_var, y_true, ax, pred_y_mean_c
     px = np.arange(0, 1, 0.01)
     ax.plot(px, np.repeat(1, px.shape), color='lightgray', linestyle="--", alpha=0.75)
 
+    ax.set_xticklabels([])
+
     ax.margins(0, 0.06)
 
 

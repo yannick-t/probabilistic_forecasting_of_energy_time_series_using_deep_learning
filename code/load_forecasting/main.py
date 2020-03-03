@@ -49,15 +49,15 @@ def main():
     # models = [ModelEnum.quantile_reg, ModelEnum.linear_reg]
 
     # Forecasting case with short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=False,
-                    generate_plots=True)
+    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
+                    generate_plots=True, save_res=True, recalibrate=True)
     # Forecasting case without short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=False,
-                    generate_plots=True)
+    # evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=False,
+    #                 generate_plots=True)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
-                    crps_loss=False, generate_plots=True, recalibrate=False):
+                    crps_loss=False, generate_plots=True, recalibrate=False, save_res=True):
     # evaluate given models fot the thesis, training with found hyper parameters
     # (initialization with parameters is located in the init method for each method)
     # default to all models
@@ -72,6 +72,9 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
         plot_prefix = prefix + '_'.join([m.name for m in model_names]) + '_'
     else:
         plot_prefix = prefix + 'all_'
+
+    if recalibrate:
+        plot_prefix = plot_prefix + 'recalibrated_'
 
     # load / preprocess dataset if needed
     train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False,
@@ -104,7 +107,17 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
         pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recals)[1] for pred_ood_m, pred_ood_v in zip(pred_ood_means, pred_ood_vars)]
 
     scores = eval_models(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars, result_folder, plot_prefix, generate_plots)
-    save_results(predict_times, scores, result_folder, prefix, train_time_df=train_times)
+
+    if save_res:
+        if recalibrate:
+            # new results but same train times, load from results
+            path = result_folder + prefix + 'results.csv'
+            if os.path.exists(path):
+                result_df = pd.read_csv(path, index_col=0)
+                train_times = result_df[['train_time']]
+            save_results(predict_times, scores, result_folder, prefix + 'recalibrated_', train_time_df=train_times)
+        else:
+            save_results(predict_times, scores, result_folder, prefix, train_time_df=train_times)
 
 
 def init_models(x_train, y_train, short_term, model_names=None, crps=False):
@@ -203,7 +216,7 @@ def save_results(predict_time_df, score_df, result_folder, result_prefix, train_
     predict_time_df.loc[:, 'predict_time'] = predict_time_df.loc[:, 'predict_time'] / 1e9  # nanosecods to seconds
 
     # load results df and append results if available
-    path = result_folder + result_prefix + 'train_time.csv'
+    path = result_folder + result_prefix + 'results.csv'
     if os.path.exists(path):
         result_df = pd.read_csv(path, index_col=0)
 
