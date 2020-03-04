@@ -1,16 +1,16 @@
-from scipy import stats
 from scipy.optimize import minimize
 import numpy as np
 
-from evaluation.calibration import pit_calc
+from evaluation.scoring import crps
 
 
 def recalibrate(pred_means, pred_vars, y_true):
     # correct over / under-dispersion and bias in a post processing step
     # minimizing over uniform pit
     def fn(x):
-        pt = pit_calc(pred_means + x[0], pred_vars * x[1], y_true)
-        res = stats.kstest(pt, 'uniform').statistic
+        pmn = pred_means + x[0]
+        pvn = pred_vars * x[1]
+        res = crps(pmn, np.sqrt(pvn), y_true)
         return res
 
     min_res = minimize(fn, x0=np.array([0, 1]), bounds=[(None, None), (0.001, None)], method='SLSQP', options={'eps': 1e-4})

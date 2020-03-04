@@ -28,10 +28,12 @@ def sharpness_plot_histogram(pred_y_var, ax):
 
 
 def sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
-    sns.kdeplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', cut=0)
-    sns.rugplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', height=0.025)
-    sns.kdeplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue', shade=True, cut=0)
-    sns.rugplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue')
+    sns.displot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue', shade=True, cut=0)
+    sns.displot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', shade=True, cut=0)
+    # sns.kdeplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue', shade=True, cut=0)
+    # sns.rugplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue')
+    # sns.kdeplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', cut=0)
+    # sns.rugplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', height=0.025)
     ax.set_yticklabels([])
     ax.margins(0, 0.06)
 

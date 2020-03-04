@@ -17,7 +17,18 @@ names_pretty_dict = {ModelEnum.simple_nn_aleo.name: 'Simple NN', ModelEnum.concr
                      ModelEnum.quantile_reg.name: 'Quantile Regr.'}
 
 
-def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, pred_ood_vars, result_folder, result_prefix, generate_plots=True):
+def evaluate_ood_multiple(names, pred_vars, pred_ood_vars, result_folder, result_prefix):
+    names_pretty = [names_pretty_dict[name] for name in names]
+
+    # epistemic out of distribution evaluation
+    for counter, p_ood in enumerate(pred_ood_vars):
+        sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
+        plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
+
+    plt.show()
+
+
+def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, result_folder, result_prefix, generate_plots=True):
     names_pretty = [names_pretty_dict[name] for name in names]
 
     if generate_plots:
@@ -30,11 +41,6 @@ def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, pred
         # sharpness
         sharpness_plot_multiple(names_pretty, pred_vars)
         plt.savefig(result_folder + result_prefix + 'calibration_sharpness.pdf')
-
-        # epistemic out of distribution evaluation
-        for counter, p_ood in enumerate(pred_ood_vars):
-            sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
-            plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
 
         plt.show()
 

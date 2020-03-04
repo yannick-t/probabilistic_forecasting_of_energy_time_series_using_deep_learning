@@ -1,13 +1,16 @@
 import os
 import time
 
+import matplotlib.pyplot as plt
+
 import pandas as pd
 import statsmodels.api as sm
 import numpy as np
 import torch
 from skorch.callbacks import EarlyStopping, EpochScoring
 
-from evaluation.evaluate_forecasting_util import evaluate_multiple, evaluate_single
+from evaluation.evaluate_forecasting_util import evaluate_multiple, evaluate_single, evaluate_ood_multiple, \
+    plot_test_data
 from evaluation.scoring import crps
 from load_forecasting.forecast_util import dataset_df_to_np
 from load_forecasting.post_processing import recalibrate
@@ -49,15 +52,15 @@ def main():
     # models = [ModelEnum.quantile_reg, ModelEnum.linear_reg]
 
     # Forecasting case with short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=True, recalibrate=True)
+    # evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
+    #                 generate_plots=True, save_res=True, recalibrate=True)
     # Forecasting case without short term lagged vars
-    # evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=False,
-    #                 generate_plots=True)
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
+                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
-                    crps_loss=False, generate_plots=True, recalibrate=False, save_res=True):
+                    crps_loss=False, generate_plots=True, recalibrate=False, save_res=True, eval_ood=True):
     # evaluate given models fot the thesis, training with found hyper parameters
     # (initialization with parameters is located in the init method for each method)
     # default to all models
@@ -87,10 +90,6 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
     y_test_orig = scaler.inverse_transform(y_test) + offset_test
     y_train_orig = scaler.inverse_transform(y_train) + offset_train
 
-    # random data to serve as out of distribution data
-    # to test epistemic unc. capabilities of models
-    x_oods = generate_ood_data(test_df, x_test, short_term)
-
     # initialize and evaluate all methods, train and save if load_saved_models is false
     models = init_models(x_train, y_train, short_term, model_names)
     models, train_times = train_load_models(models, x_train, y_train, model_folder, prefix, load_saved_models)
@@ -99,14 +98,29 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
 
     pred_means, pred_vars, pred_vars_aleo, pred_vars_epis, predict_times = \
         models_predict_transform(models, x_test, scaler, offset_test)
-    (pred_ood_means, pred_ood_vars) = zip(*[models_predict_transform(models, x_ood, scaler)[0: 2] for x_ood in x_oods])
 
     if recalibrate:
         recals = models_recalibrate(models, x_train, y_train_orig, scaler, offset_train)
         pred_means, pred_vars = models_post_process(pred_means, pred_vars, recals)
-        pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recals)[1] for pred_ood_m, pred_ood_v in zip(pred_ood_means, pred_ood_vars)]
 
-    scores = eval_models(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars, result_folder, plot_prefix, generate_plots)
+    scores = evaluate_multiple(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, result_folder, plot_prefix, generate_plots)
+
+    if eval_ood and generate_plots:
+        # random data to serve as out of distribution data
+        # to test epistemic unc. capabilities of models
+        x_oods = generate_ood_data(test_df, x_test, short_term)
+        (pred_ood_means, pred_ood_vars) = zip(*[models_predict_transform(models, x_ood, scaler)[0: 2] for x_ood in x_oods])
+
+        if recalibrate:
+            pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recals)[1] for pred_ood_m, pred_ood_v in
+                             zip(pred_ood_means, pred_ood_vars)]
+
+        evaluate_ood_multiple(models.keys(), pred_vars, pred_ood_vars, result_folder, plot_prefix)
+
+        ax = plt.subplot(1, 1, 1)
+        plot_test_data(pred_means[0], pred_vars[0], y_test_orig, timestamp_test, ax)
+        plt.show()
+
 
     if save_res:
         if recalibrate:
@@ -114,7 +128,7 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
             path = result_folder + prefix + 'results.csv'
             if os.path.exists(path):
                 result_df = pd.read_csv(path, index_col=0)
-                train_times = result_df[['train_time']]
+                train_times = result_df[['train_time']] * (1e9 * 60)
             save_results(predict_times, scores, result_folder, prefix + 'recalibrated_', train_time_df=train_times)
         else:
             save_results(predict_times, scores, result_folder, prefix, train_time_df=train_times)
@@ -201,14 +215,6 @@ def models_post_process(pred_means, pred_vars, post_processors):
     return tuple(zip(*[post_processor(pm, pv) for (pm, pv, post_processor) in zip(pred_means, pred_vars, post_processors)]))
 
 
-def eval_models(model_names, pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars,
-                result_folder, result_prefix, generate_plots=True):
-    scores_df = evaluate_multiple(model_names, pred_means, pred_vars, pred_vars_aleo, y_test_orig, pred_ood_vars,
-                                  result_folder, result_prefix, generate_plots=generate_plots)
-
-    return scores_df
-
-
 def save_results(predict_time_df, score_df, result_folder, result_prefix, train_time_df=None):
     # convert times
     if train_time_df is not None:
@@ -240,17 +246,17 @@ def save_results(predict_time_df, score_df, result_folder, result_prefix, train_
 def generate_ood_data(test_df, x_test, short_term):
     x_oods = []
     # similar data to test set in dimensions of load and real indicator values
-    ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322)
+    ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322, min_variation=1)
     x_ood_0, _, _ = dataset_df_to_np(ood_0_df)
     x_oods.append(x_ood_0)
-    # very differenct ranges
-    ood_1_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=42, variation=4)
-    x_ood_1, _, _ = dataset_df_to_np(ood_1_df)
-    x_oods.append(x_ood_1)
+    # # very differenct ranges
+    # ood_1_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=42, variation=4)
+    # x_ood_1, _, _ = dataset_df_to_np(ood_1_df)
+    # x_oods.append(x_ood_1)
     # completely random (including indicator variables)
-    np.random.seed(492)
-    x_ood_2 = np.random.uniform(-2, 2, size=x_test.shape)
-    x_oods.append(x_ood_2)
+    # np.random.seed(492)
+    # x_ood_2 = np.random.uniform(-2, 2, size=x_test.shape)
+    # x_oods.append(x_ood_2)
 
     return x_oods
 
