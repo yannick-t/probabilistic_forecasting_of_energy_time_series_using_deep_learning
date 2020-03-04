@@ -4,8 +4,6 @@ from scipy.special import erfinv
 import numpy as np
 import pandas as pd
 
-from evaluation.evaluateion_plot_util import plot_multiple
-
 
 def sharpness_plot_multiple(names, pred_y_var):
     fig, ax = plt.subplots(figsize=(6, 3.0))
@@ -27,33 +25,8 @@ def sharpness_plot_histogram(pred_y_var, ax):
     ax.margins(0, 0.06)
 
 
-def sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
-    sns.displot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue', shade=True, cut=0)
-    sns.displot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', shade=True, cut=0)
-    # sns.kdeplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue', shade=True, cut=0)
-    # sns.rugplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue')
-    # sns.kdeplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', cut=0)
-    # sns.rugplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', height=0.025)
-    ax.set_yticklabels([])
-    ax.margins(0, 0.06)
-
-
-def sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_vars):
-    count = len(names)
-
-    def plot_fn(counter, ax):
-        name = names[counter]
-        p_test_var = pred_test_vars[counter]
-        p_ood_var = pred_ood_vars[counter]
-
-        ax.set_title(name)
-        sharpness_plot_histogram_joint(p_test_var, p_ood_var, ax)
-
-    plot_multiple(plot_fn, count, sharey=False)
-
-
 def sharpness_plot_(pred_y_var, ax, names=None):
-    quantiles = [0.5, 0.9]
+    quantiles = [0.9]
 
     pred_y_var = np.array(pred_y_var)
 

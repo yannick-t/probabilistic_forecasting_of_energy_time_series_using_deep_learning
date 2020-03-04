@@ -1,12 +1,16 @@
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from evaluation.calibration import probabilistic_calibration_multiple, marginal_calibration_multiple, interval_coverage, \
     probabilistic_calibration, marginal_calibration
+from evaluation.ood import ood_timeframe_multiple, sharpness_plot_histogram_joint, \
+    sharpness_plot_histogram_joint_multiple
 from evaluation.scoring import rmse, mape, crps, log_likelihood
-from evaluation.sharpness import sharpness_plot_multiple, sharpness_plot_histogram_joint_multiple, sharpness_avg_width, \
-    sharpness_plot, sharpness_plot_histogram_joint
+from evaluation.sharpness import sharpness_plot_multiple, sharpness_avg_width, \
+    sharpness_plot
 from util.model_enum import ModelEnum
 
 # pretty names for plot titles etc.
@@ -17,13 +21,19 @@ names_pretty_dict = {ModelEnum.simple_nn_aleo.name: 'Simple NN', ModelEnum.concr
                      ModelEnum.quantile_reg.name: 'Quantile Regr.'}
 
 
-def evaluate_ood_multiple(names, pred_vars, pred_ood_vars, result_folder, result_prefix):
+def evaluate_ood_multiple(names, pred_means, pred_vars, y_true_orig, timestamp, pred_ood_vars, result_folder, result_prefix):
     names_pretty = [names_pretty_dict[name] for name in names]
 
     # epistemic out of distribution evaluation
+    # random data
     for counter, p_ood in enumerate(pred_ood_vars):
         sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
         plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
+
+    # timeframe with large prediction errors
+    # ood_timeframe_multiple(names_pretty, datetime(year=2018, month=10, day=2), datetime(year=2018, month=10, day=4), pred_means, pred_vars,
+    #                        timestamp, y_true_orig)
+    # plt.savefig(result_folder + result_prefix + 'timeframe_ood' + '.pdf')
 
     plt.show()
 

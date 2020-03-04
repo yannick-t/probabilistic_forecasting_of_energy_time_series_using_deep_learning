@@ -1,6 +1,8 @@
+from scipy import stats
 from scipy.optimize import minimize
 import numpy as np
 
+from evaluation.calibration import pit_calc
 from evaluation.scoring import crps
 
 
@@ -10,10 +12,12 @@ def recalibrate(pred_means, pred_vars, y_true):
     def fn(x):
         pmn = pred_means + x[0]
         pvn = pred_vars * x[1]
+        # pt = pit_calc(pmn, pvn, y_true)
+        # res = stats.kstest(pt, 'uniform').statistic
         res = crps(pmn, np.sqrt(pvn), y_true)
         return res
 
-    min_res = minimize(fn, x0=np.array([0, 1]), bounds=[(None, None), (0.001, None)], method='SLSQP', options={'eps': 1e-4})
+    min_res = minimize(fn, x0=np.array([0, 1]), bounds=[(None, None), (0.001, None)], method='SLSQP', options={'eps': 1e-5})
 
     return Recal(min_res.x)
 

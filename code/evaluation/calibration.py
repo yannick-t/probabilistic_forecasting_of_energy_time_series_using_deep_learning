@@ -4,7 +4,7 @@ from torch.distributions import Normal
 import numpy as np
 import seaborn as sm
 
-from evaluation.evaluateion_plot_util import plot_multiple
+from evaluation.evaluation_plot_util import plot_multiple
 
 
 def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true, pred_y_mean_comp=None, pred_y_var_comp=None):
