@@ -88,7 +88,7 @@ def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, resu
     return scores
 
 
-def evaluate_single(pred_mean, pred_var, true_y, pred_ood_var):
+def evaluate_single(pred_mean, pred_var, true_y, pred_ood_var=None):
     # calibration
     ax = plt.subplot(2, 2, 1)
     ax.set_title('Probabilistic Calibration: Probability Integral Transform Histogram')
@@ -109,8 +109,9 @@ def evaluate_single(pred_mean, pred_var, true_y, pred_ood_var):
     ax.set_title('Sharpness: Predictive Interval Width Boxplot')
     sharpness_plot(pred_var, ax)
     ax = plt.subplot(2, 2, 4)
-    ax.set_title('Sharpness: Predictive Interval Width Histogram')
-    sharpness_plot_histogram_joint(pred_var, pred_ood_var, ax)
+    if pred_ood_var is not None:
+        ax.set_title('Sharpness: Predictive Interval Width Histogram')
+        sharpness_plot_histogram_joint(pred_var, pred_ood_var, ax)
     avg_5, avg_9 = sharpness_avg_width(pred_var)
     print('Average central 50%% interval width: %.5f' % avg_5)
     print('Average central 90%% interval width: %.5f' % avg_9)

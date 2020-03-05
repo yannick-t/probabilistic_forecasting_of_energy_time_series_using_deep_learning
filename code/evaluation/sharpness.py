@@ -14,8 +14,8 @@ def sharpness_plot_multiple(names, pred_y_var):
     # plt.subplots_adjust(left=0.1)
 
 
-def sharpness_plot(pred_y_var, ax, scaler=None):
-    sharpness_plot_([pred_y_var], ax, scaler=scaler)
+def sharpness_plot(pred_y_var, ax):
+    sharpness_plot_([pred_y_var], ax)
 
 
 def sharpness_plot_histogram(pred_y_var, ax):
