@@ -49,14 +49,14 @@ def main():
 
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
                ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    # models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.deep_ens, ModelEnum.dgp]
+    # models = [ModelEnum.simple_nn_aleo, ModelEnum.concrete]
 
     # Forecasting case with short term lagged vars
     evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
                     generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
     # Forecasting case without short term lagged vars
-    # evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
-    #                 generate_plots=True, save_res=False, recalibrate=True, eval_ood=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
+                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
@@ -368,7 +368,7 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
         epochs = 3306
     else:
         hs = [132, 77, 50]
-        prior_mu = -5
+        prior_mu = 0
         prior_sigma = 0.1
         lr = 0.000423
         epochs = 3430

@@ -6,8 +6,8 @@ import pandas as pd
 
 from evaluation.calibration import probabilistic_calibration_multiple, marginal_calibration_multiple, interval_coverage, \
     probabilistic_calibration, marginal_calibration
-from evaluation.ood import ood_timeframe_multiple, sharpness_plot_histogram_joint, \
-    sharpness_plot_histogram_joint_multiple
+from evaluation.ood import ood_timeframe_multiple, ood_sharpness_plot_histogram_joint, \
+    ood_sharpness_plot_histogram_joint_multiple
 from evaluation.scoring import rmse, mape, crps, log_likelihood
 from evaluation.sharpness import sharpness_plot_multiple, sharpness_avg_width, \
     sharpness_plot
@@ -27,7 +27,7 @@ def evaluate_ood_multiple(names, pred_means, pred_vars, y_true_orig, timestamp, 
     # epistemic out of distribution evaluation
     # random data
     for counter, p_ood in enumerate(pred_ood_vars):
-        sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
+        ood_sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
         plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
 
     # timeframe with large prediction errors
@@ -111,7 +111,7 @@ def evaluate_single(pred_mean, pred_var, true_y, pred_ood_var=None):
     ax = plt.subplot(2, 2, 4)
     if pred_ood_var is not None:
         ax.set_title('Sharpness: Predictive Interval Width Histogram')
-        sharpness_plot_histogram_joint(pred_var, pred_ood_var, ax)
+        ood_sharpness_plot_histogram_joint(pred_var, pred_ood_var, ax)
     avg_5, avg_9 = sharpness_avg_width(pred_var)
     print('Average central 50%% interval width: %.5f' % avg_5)
     print('Average central 90%% interval width: %.5f' % avg_9)

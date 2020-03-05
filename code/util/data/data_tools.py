@@ -31,11 +31,7 @@ def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, sc
     # use GW for convenience and readability later, also the standard-scaled values are smaller
     dataframe = dataframe / 1000
 
-    if calendars is None:
-        # calendars to be used for holiday encoding, complete Germany
-        # as well as some important (high load) states
-        cal = wk.Germany()
-        calendars = [cal, wk.NorthRhineWestphalia(), wk.Bavaria(), wk.BadenWurttemberg(), wk.LowerSaxony()]
+
 
     # split data first so scaler and deseasonilizing can be trained on train set properly
     train_df_o, test_df_o = train_test_split(dataframe, test_size=0.2, shuffle=False)
@@ -77,8 +73,14 @@ def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, sc
     return train_df, test_df, scaler
 
 
-def construct_features(dataframe, offset, calendars, short_term=True, quarter_hour=True, n_ahead=1):
+def construct_features(dataframe, offset, calendars=None, short_term=True, quarter_hour=True, n_ahead=1):
     # pre process, define features for forecasting
+
+    if calendars is None:
+        # calendars to be used for holiday encoding, complete Germany
+        # as well as some important (high load) states
+        cal = wk.Germany()
+        calendars = [cal, wk.NorthRhineWestphalia(), wk.Bavaria(), wk.BadenWurttemberg(), wk.LowerSaxony()]
 
     # adjust for lagged variables so there are lagged variables for all targets
     adj_days = 7
