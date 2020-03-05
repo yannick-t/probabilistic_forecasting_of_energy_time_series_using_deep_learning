@@ -49,18 +49,19 @@ def main():
 
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
                ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
+    # models = [ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
     # models = [ModelEnum.simple_nn_aleo, ModelEnum.concrete]
 
     # Forecasting case with short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
-    # Forecasting case without short term lagged vars
-    # evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
+    # evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
     #                 generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
+    # Forecasting case without short term lagged vars
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
+                    generate_plots=False, save_res=True, recalibrate=False, eval_ood=True, crps_loss=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
-                    crps_loss=False, generate_plots=True, recalibrate=False, save_res=True, eval_ood=True):
+                    crps_loss=False, generate_plots=True, recalibrate=False, save_res=True, eval_ood=True, eval_train=False):
     # evaluate given models fot the thesis, training with found hyper parameters
     # (initialization with parameters is located in the init method for each method)
     # default to all models
@@ -78,6 +79,8 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
 
     if recalibrate:
         plot_prefix = plot_prefix + 'recalibrated_'
+    if eval_train:
+        plot_prefix = plot_prefix + 'on_train_'
 
     # load / preprocess dataset if needed
     train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=short_term, reprocess=False,
@@ -95,6 +98,15 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
     models, train_times = train_load_models(models, x_train, y_train, model_folder, prefix, load_saved_models)
     if load_saved_models:
         train_times = None
+
+    if eval_train:
+        # force evaluate on training data
+        x_test = x_train
+        y_test = y_train
+        offset_test = offset_train
+        y_test_orig = y_train_orig
+        test_df = train_df
+        timestamp_test = train_df.index.to_numpy()
 
     pred_means, pred_vars, pred_vars_aleo, pred_vars_epis, predict_times = \
         models_predict_transform(models, x_test, scaler, offset_test)
@@ -117,7 +129,7 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
 
         evaluate_ood_multiple(models.keys(), pred_means, pred_vars, y_test_orig, timestamp_test, pred_ood_vars, result_folder, plot_prefix)
 
-    if save_res:
+    if save_res and not eval_train:
         if recalibrate:
             # new results but same train times, load from results
             path = result_folder + prefix + 'results.csv'
