@@ -60,12 +60,12 @@ def ood_sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_
 
         ax.set_title(name)
         # cut down data a little for clarity for some methods
-        cutoff = None
-        if name == 'Simple NN' or name == 'Concrete':
-            cutoff = 1.5
-        if cutoff is not None:
-            p_ood_var = p_ood_var[p_ood_var < cutoff]
-            p_test_var = p_test_var[p_test_var < cutoff]
+        # cutoff = None
+        # if name == 'Simple NN' or name == 'Concrete':
+        #     cutoff = 1.5
+        # if cutoff is not None:
+        #     p_ood_var = p_ood_var[p_ood_var < cutoff]
+        #     p_test_var = p_test_var[p_test_var < cutoff]
         ood_sharpness_plot_histogram_joint(p_test_var, p_ood_var, ax)
 
     plot_multiple(plot_fn, count, sharey=False)

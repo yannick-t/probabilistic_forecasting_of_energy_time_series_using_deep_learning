@@ -47,17 +47,17 @@ def main():
     prefix = 'load_forecasting_'
     result_folder = '../results/'
 
-    models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
-               ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
+    # models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
+    #            ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
     # models = [ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    # models = [ModelEnum.simple_nn_aleo, ModelEnum.concrete]
+    models = [ModelEnum.concrete]
 
     # Forecasting case with short term lagged vars
-    # evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
-    #                 generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
+    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=False,
+                    generate_plots=False, save_res=True, recalibrate=False, eval_ood=False)
     # Forecasting case without short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
-                    generate_plots=False, save_res=True, recalibrate=False, eval_ood=True, crps_loss=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=False,
+                    generate_plots=False, save_res=True, recalibrate=False, eval_ood=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
@@ -498,12 +498,15 @@ def concrete_init(x_train, y_train, short_term, crps_loss=False):
         hs = [24, 64, 32]
         lr = 0.00051
         epochs = 3400
-        lengthscale = 1e-9
+        # epochs = 50
+        lengthscale = 1e-4
+        tau = 2e-3
     else:
         hs = [132, 77, 50]
         lr = 0.0001
         epochs = 271
-        lengthscale = 1e-9
+        lengthscale = 1e-4
+        tau = 2e-3
 
     concrete_model = ConcreteSkorch(
         module=ConcreteDropoutNN,
@@ -511,6 +514,7 @@ def concrete_init(x_train, y_train, short_term, crps_loss=False):
         module__output_size=y_train.shape[-1] * 2,
         module__hidden_size=hs,
         lengthscale=lengthscale,
+        tau=tau,
         dataset_size=x_train.shape[0],
         sample_count=30,
         lr=lr,
