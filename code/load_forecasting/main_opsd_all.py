@@ -49,14 +49,14 @@ def main():
 
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
                ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    # models = [ModelEnum.quantile_reg, ModelEnum.linear_reg]
+    # models = [ModelEnum.simple_nn_aleo, ModelEnum.concrete]
 
     # Forecasting case with short term lagged vars
-    # evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
-    #                 generate_plots=True, save_res=True, recalibrate=True)
+    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
+                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
     # Forecasting case without short term lagged vars
     evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=False)
+                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
@@ -115,12 +115,7 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
             pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recals)[1] for pred_ood_m, pred_ood_v in
                              zip(pred_ood_means, pred_ood_vars)]
 
-        evaluate_ood_multiple(models.keys(), pred_vars, pred_ood_vars, result_folder, plot_prefix)
-
-        ax = plt.subplot(1, 1, 1)
-        plot_test_data(pred_means[0], pred_vars[0], y_test_orig, timestamp_test, ax)
-        plt.show()
-
+        evaluate_ood_multiple(models.keys(), pred_means, pred_vars, y_test_orig, timestamp_test, pred_ood_vars, result_folder, plot_prefix)
 
     if save_res:
         if recalibrate:
@@ -246,7 +241,7 @@ def save_results(predict_time_df, score_df, result_folder, result_prefix, train_
 def generate_ood_data(test_df, x_test, short_term):
     x_oods = []
     # similar data to test set in dimensions of load and real indicator values
-    ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322, min_variation=1)
+    ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322, min_variation=2)
     x_ood_0, _, _ = dataset_df_to_np(ood_0_df)
     x_oods.append(x_ood_0)
     # # very differenct ranges
@@ -254,9 +249,9 @@ def generate_ood_data(test_df, x_test, short_term):
     # x_ood_1, _, _ = dataset_df_to_np(ood_1_df)
     # x_oods.append(x_ood_1)
     # completely random (including indicator variables)
-    # np.random.seed(492)
-    # x_ood_2 = np.random.uniform(-2, 2, size=x_test.shape)
-    # x_oods.append(x_ood_2)
+    np.random.seed(492)
+    x_ood_2 = np.random.uniform(-10, 10, size=x_test.shape)
+    x_oods.append(x_ood_2)
 
     return x_oods
 
@@ -373,7 +368,7 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
         epochs = 3306
     else:
         hs = [132, 77, 50]
-        prior_mu = -5
+        prior_mu = 0
         prior_sigma = 0.1
         lr = 0.000423
         epochs = 3430

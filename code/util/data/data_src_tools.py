@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 import pandas
 import numpy as np
@@ -8,8 +9,36 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from util.data.data_tools import preprocess_load_data_forec
 
 
+def load_uci_load():
+    load_processed_path = '../tmp/uci_load_15_clean.csv'
+
+    if not os.path.exists(load_processed_path):
+        dataset = pandas.read_csv('../../LD2011_2014.txt', header=0, low_memory=False,
+                                  infer_datetime_format=True, parse_dates=[0],
+                                  index_col=0, sep=';', decimal=',')
+
+
+        load_df = pandas.DataFrame(dataset.sum(axis=1), columns=['load'])
+        # shorten df so data for most clients is available
+        load_df = load_df.loc[datetime(year=2012, month=1, day=1):, ['load']]
+
+        # drop nan at end and beginning
+        first_idx = load_df.first_valid_index()
+        last_idx = load_df.last_valid_index()
+        load_df = load_df.loc[first_idx:last_idx]
+        # interpolate rest
+        if load_df.isna().any()[0]:
+            load_df = load_df.interpolate()
+
+        load_df.to_csv(load_processed_path)
+    else:
+        load_df = pandas.read_csv(load_processed_path, header=0,
+                                  infer_datetime_format=True, parse_dates=[0], index_col=[0])
+    return load_df
+
+
 def load_opsd_de_load_statistics():
-    load_processed_path = '../../opsd_de_load_statistics_60_clean.csv'
+    load_processed_path = '../tmp/opsd_de_load_statistics_60_clean.csv'
     if not os.path.exists(load_processed_path):
         dataset = pandas.read_csv('../../time_series_60min_singleindex.csv', header=0, low_memory=False,
                                   infer_datetime_format=True, parse_dates=['utc_timestamp'],
@@ -25,7 +54,7 @@ def load_opsd_de_load_statistics():
 
 
 def load_opsd_de_load_transparency():
-    load_processed_path = '../../opsd_de_load_transparency_15_clean.csv'
+    load_processed_path = '../tmp/opsd_de_load_transparency_15_clean.csv'
     if not os.path.exists(load_processed_path):
         dataset = pandas.read_csv('../../time_series_15min_singleindex.csv', header=0, low_memory=False,
                                   infer_datetime_format=True, parse_dates=['utc_timestamp'],
