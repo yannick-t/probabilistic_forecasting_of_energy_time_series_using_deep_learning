@@ -57,7 +57,7 @@ def sharpness_plot_(pred_y_var, ax, names=None):
     # Journal of the Royal Statistical Society: Series B (Statistical Methodology), 69(2), 243-268.")
     sns.boxplot(x='Quantile', y='Width', hue='Method', data=widths, whis=[5, 95], ax=ax, showfliers=False)
 
-    ax.set_xlim(left=-1)
+    ax.set_xlim(left=-0.8)
 
 
 def sharpness_avg_width(pred_var):

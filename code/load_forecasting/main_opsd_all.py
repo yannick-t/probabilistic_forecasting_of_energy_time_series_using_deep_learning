@@ -55,8 +55,8 @@ def main():
     evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
                     generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
     # Forecasting case without short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
+    # evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
+    #                 generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
