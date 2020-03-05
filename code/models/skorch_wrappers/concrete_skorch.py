@@ -8,9 +8,10 @@ from models.skorch_wrappers.combined_unc_nn_skorch import CombinedUncNNSkorch
 
 # wrapper for concrete dropout to supply lengthscale and automatically calculate the regularization parameters
 class ConcreteSkorch(CombinedUncNNSkorch):
-    def __init__(self, lengthscale, dataset_size, *args, **kwargs):
+    def __init__(self, lengthscale, tau, dataset_size, *args, **kwargs):
 
         self.lengthscale = lengthscale
+        self.tau = tau
         self.dataset_size = dataset_size
 
         super().__init__(*args, **kwargs)
@@ -18,8 +19,8 @@ class ConcreteSkorch(CombinedUncNNSkorch):
     def calc_params(self):
         # calculate regularization parameters according to paper
 
-        wr = self.lengthscale ** 2. / self.dataset_size
-        dr = 2. / self.dataset_size
+        wr = self.lengthscale ** 2. / (self.tau * self.dataset_size)
+        dr = 2. / (self.tau * self.dataset_size)
 
         self.module__weight_regularizer = wr
         self.module__dropout_regularizer = dr
