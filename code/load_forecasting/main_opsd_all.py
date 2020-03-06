@@ -47,17 +47,17 @@ def main():
     prefix = 'load_forecasting_'
     result_folder = '../results/'
 
-    # models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
-    #            ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
+    models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
+              ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
     # models = [ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    models = [ModelEnum.concrete]
+    # models = [ModelEnum.concrete]
 
     # Forecasting case with short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=False,
-                    generate_plots=False, save_res=True, recalibrate=False, eval_ood=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
+                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=True)
     # Forecasting case without short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=False,
-                    generate_plots=False, save_res=True, recalibrate=False, eval_ood=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
+                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
