@@ -50,14 +50,13 @@ def main():
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
               ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
     # models = [ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    # models = [ModelEnum.concrete]
 
     # Forecasting case with short term lagged vars
     evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=True)
+                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
     # Forecasting case without short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=False)
+    # evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
+    #                 generate_plots=True, save_res=True, recalibrate=True, eval_ood=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
@@ -261,9 +260,9 @@ def generate_ood_data(test_df, x_test, short_term):
     # x_ood_1, _, _ = dataset_df_to_np(ood_1_df)
     # x_oods.append(x_ood_1)
     # completely random (including indicator variables)
-    np.random.seed(492)
-    x_ood_2 = np.random.uniform(-10, 10, size=x_test.shape)
-    x_oods.append(x_ood_2)
+    # np.random.seed(492)
+    # x_ood_2 = np.random.uniform(-10, 10, size=x_test.shape)
+    # x_oods.append(x_ood_2)
 
     return x_oods
 

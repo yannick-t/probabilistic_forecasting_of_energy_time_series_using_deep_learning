@@ -39,13 +39,9 @@ def ood_timeframe(start_time, end_time, pred_mean, pred_var, timestamp, y_true, 
                     alpha=0.5, color='orange')
 
 
-def ood_sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax, bw='scott'):
-    sns.distplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange',
-                 kde=False, kde_kws={'cut': 0, 'bw': bw}
-                 )
-    sns.distplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue',
-                 kde=False, kde_kws={'cut': 0, 'bw': bw}
-                 )
+def ood_sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):
+    sns.distplot(np.sqrt(pred_ood_var).squeeze(), ax=ax, color='orange', kde=False)
+    sns.distplot(np.sqrt(pred_test_var).squeeze(), ax=ax, color='lightblue', kde=False)
     ax.set_yticklabels([])
     ax.margins(0, 0.06)
 
@@ -60,12 +56,16 @@ def ood_sharpness_plot_histogram_joint_multiple(names, pred_test_vars, pred_ood_
 
         ax.set_title(name)
         # cut down data a little for clarity for some methods
-        # cutoff = None
-        # if name == 'Simple NN' or name == 'Concrete':
-        #     cutoff = 1.5
-        # if cutoff is not None:
-        #     p_ood_var = p_ood_var[p_ood_var < cutoff]
-        #     p_test_var = p_test_var[p_test_var < cutoff]
+        cutoff = None
+        if name == 'Simple NN':
+            cutoff = 3**2
+        if name == 'Concrete':
+            cutoff = 4**2
+        if name == 'Deep Ens.':
+            cutoff = 4**2
+        if cutoff is not None:
+            p_ood_var = p_ood_var[p_ood_var < cutoff]
+            p_test_var = p_test_var[p_test_var < cutoff]
         ood_sharpness_plot_histogram_joint(p_test_var, p_ood_var, ax)
 
     plot_multiple(plot_fn, count, sharey=False)
