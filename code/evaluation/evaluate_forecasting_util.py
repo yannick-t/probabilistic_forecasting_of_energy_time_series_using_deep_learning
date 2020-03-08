@@ -38,12 +38,16 @@ def evaluate_ood_multiple(names, pred_means, pred_vars, y_true_orig, timestamp, 
     plt.show()
 
 
-def evaluate_multiple(names, pred_means, pred_vars, pred_vars_aleo, true_y, result_folder, result_prefix, generate_plots=True):
+def evaluate_multiple(names, pred_means, pred_vars, pred_means_pit_comp, pred_vars_pit_comp, true_y, result_folder, result_prefix, generate_plots=True):
     names_pretty = [names_pretty_dict[name] for name in names]
 
     if generate_plots:
         # calibration
-        probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
+        if pred_vars_pit_comp is not None:
+            probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y, pred_means_pit_comp, pred_vars_pit_comp)
+        else:
+            probabilistic_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
+
         plt.savefig(result_folder + result_prefix + 'calibration_probabilistic.pdf')
         marginal_calibration_multiple(names_pretty, pred_means, pred_vars, true_y)
         plt.savefig(result_folder + result_prefix + 'calibration_marginal.pdf')
