@@ -50,10 +50,12 @@ def probabilistic_calibration(pred_y_mean, pred_y_var, y_true, ax, pred_y_mean_c
 
     pt = pit_calc(pred_y_mean, pred_y_var, y_true)
 
-    sm.distplot(pt, n_bins, kde=False, norm_hist=True, color='lightblue', hist_kws={'rwidth': 0.9}, ax=ax)
     if pred_y_var_comp is not None:
         pt1 = pit_calc(pred_y_mean_comp, pred_y_var_comp, y_true)
         sm.distplot(pt1, n_bins, kde=False, norm_hist=True, color='orange', hist_kws={'rwidth': 0.9}, ax=ax)
+
+    sm.distplot(pt, n_bins, kde=False, norm_hist=True, color='lightblue', hist_kws={'alpha': 0.5, 'rwidth': 0.9}, ax=ax)
+
 
     # 1 line (uniform distribution)
     px = np.arange(0, 1, 0.01)

@@ -49,15 +49,15 @@ def main():
 
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
               ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    # models = [ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    models = [ModelEnum.bnn]
+    # models = [ModelEnum.deep_ens]
+    # models = [ModelEnum.bnn]
 
     # Forecasting case with short term lagged vars
-    # evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=False,
-    #                 generate_plots=False, save_res=False, recalibrate=False, eval_ood=True)
+    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
+                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
     # Forecasting case without short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=False,
-                    generate_plots=True, save_res=False, recalibrate=False, eval_ood=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
+                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
@@ -111,16 +111,11 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
     pred_means, pred_vars, pred_vars_aleo, pred_vars_epis, predict_times = \
         models_predict_transform(models, x_test, scaler, offset_test)
 
-    pred_vars_pit_comp = None
-    pred_means_pit_comp = None
     if recalibrate:
-        pred_vars_pit_comp = pred_means
-        pred_means_pit_comp = pred_vars
+        recalibrators = models_recalibrate(models, x_train, y_train_orig, scaler, offset_train)
+        pred_means, pred_vars = models_post_process(pred_means, pred_vars, recalibrators)
 
-        recals = models_recalibrate(models, x_train, y_train_orig, scaler, offset_train)
-        pred_means, pred_vars = models_post_process(pred_means, pred_vars, recals)
-
-    scores = evaluate_multiple(models.keys(), pred_means, pred_vars, pred_means_pit_comp, pred_vars_pit_comp, y_test_orig, result_folder, plot_prefix, generate_plots)
+    scores = evaluate_multiple(models.keys(), pred_means, pred_vars, None, None, y_test_orig, result_folder, plot_prefix, generate_plots)
 
     if eval_ood and generate_plots:
         # random data to serve as out of distribution data
@@ -129,7 +124,7 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
         (pred_ood_means, pred_ood_vars) = zip(*[models_predict_transform(models, x_ood, scaler)[0: 2] for x_ood in x_oods])
 
         if recalibrate:
-            pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recals)[1] for pred_ood_m, pred_ood_v in
+            pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recalibrators)[1] for pred_ood_m, pred_ood_v in
                              zip(pred_ood_means, pred_ood_vars)]
 
         evaluate_ood_multiple(models.keys(), pred_means, pred_vars, y_test_orig, timestamp_test, pred_ood_vars, result_folder, plot_prefix)
