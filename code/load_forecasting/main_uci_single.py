@@ -32,8 +32,8 @@ def main():
 
     hs = [132, 77, 50]
     lr = 5.026e-05
-    # epochs = 1253
-    epochs = 100
+    epochs = 1253
+    # epochs = 100
 
     # initialize model
     ensemble_model = DeepEnsemble(

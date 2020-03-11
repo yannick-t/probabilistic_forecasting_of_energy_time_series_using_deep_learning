@@ -50,15 +50,15 @@ def main():
 
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
               ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    # models = [ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    models = [ModelEnum.bnn]
+    # models = [ModelEnum.deep_ens]
+    # models = [ModelEnum.bnn]
 
     # Forecasting case with short term lagged vars
     evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=False,
                     generate_plots=True, save_res=False, recalibrate=False, eval_ood=True)
     # Forecasting case without short term lagged vars
-    # evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
-    #                 generate_plots=True, save_res=True, recalibrate=True, eval_ood=False)
+    evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
+                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
@@ -113,10 +113,10 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
         models_predict_transform(models, x_test, scaler, offset_test)
 
     if recalibrate:
-        recals = models_recalibrate(models, x_train, y_train_orig, scaler, offset_train)
-        pred_means, pred_vars = models_post_process(pred_means, pred_vars, recals)
+        recalibrators = models_recalibrate(models, x_train, y_train_orig, scaler, offset_train)
+        pred_means, pred_vars = models_post_process(pred_means, pred_vars, recalibrators)
 
-    scores = evaluate_multiple(models.keys(), pred_means, pred_vars, pred_vars_aleo, y_test_orig, result_folder, plot_prefix, generate_plots)
+    scores = evaluate_multiple(models.keys(), pred_means, pred_vars, None, None, y_test_orig, result_folder, plot_prefix, generate_plots)
 
     if eval_ood and generate_plots:
         # random data to serve as out of distribution data
@@ -125,7 +125,7 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
         (pred_ood_means, pred_ood_vars) = zip(*[itemgetter(0, 1)(models_predict_transform(models, x_ood, scaler)) for x_ood in x_oods])
 
         if recalibrate:
-            pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recals)[1] for pred_ood_m, pred_ood_v in
+            pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recalibrators)[1] for pred_ood_m, pred_ood_v in
                              zip(pred_ood_means, pred_ood_vars)]
 
         evaluate_ood_multiple(models.keys(), pred_means, pred_vars, y_test_orig, timestamp_test, pred_ood_vars, result_folder, plot_prefix)
@@ -254,7 +254,7 @@ def save_results(predict_time_df, score_df, result_folder, result_prefix, train_
 def generate_ood_data(test_df, x_test, short_term):
     x_oods = []
     # similar data to test set in dimensions of load and real indicator values
-    ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322, min_variation=2)
+    ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322, min_variation=2, max_variation=3)
     x_ood_0, _, _ = dataset_df_to_np(ood_0_df)
     x_oods.append(x_ood_0)
     # # very differenct ranges
@@ -385,7 +385,7 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
         prior_mu = 0
         prior_sigma = 0.2
         lr = 0.000423
-        epochs = 3430
+        epochs = 6500
 
     bnn = BNNSkorch(
         module=TorchBNN,
