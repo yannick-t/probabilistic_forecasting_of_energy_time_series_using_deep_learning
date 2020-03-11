@@ -31,8 +31,6 @@ def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, sc
     # use GW for convenience and readability later, also the standard-scaled values are smaller
     dataframe = dataframe / 1000
 
-
-
     # split data first so scaler and deseasonilizing can be trained on train set properly
     train_df_o, test_df_o = train_test_split(dataframe, test_size=0.2, shuffle=False)
     if scaler is None:

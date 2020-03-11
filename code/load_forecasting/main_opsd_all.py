@@ -1,5 +1,6 @@
 import os
 import time
+from operator import itemgetter
 
 import matplotlib.pyplot as plt
 
@@ -50,10 +51,11 @@ def main():
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
               ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
     # models = [ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
+    models = [ModelEnum.bnn]
 
     # Forecasting case with short term lagged vars
-    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
+    evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=False,
+                    generate_plots=True, save_res=False, recalibrate=False, eval_ood=True)
     # Forecasting case without short term lagged vars
     # evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
     #                 generate_plots=True, save_res=True, recalibrate=True, eval_ood=False)
@@ -120,7 +122,7 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
         # random data to serve as out of distribution data
         # to test epistemic unc. capabilities of models
         x_oods = generate_ood_data(test_df, x_test, short_term)
-        (pred_ood_means, pred_ood_vars) = zip(*[models_predict_transform(models, x_ood, scaler)[0: 2] for x_ood in x_oods])
+        (pred_ood_means, pred_ood_vars) = zip(*[itemgetter(0, 1)(models_predict_transform(models, x_ood, scaler)) for x_ood in x_oods])
 
         if recalibrate:
             pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recals)[1] for pred_ood_m, pred_ood_v in
@@ -374,13 +376,14 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
     if short_term:
         hs = [24, 64, 32]
         prior_mu = 0
-        prior_sigma = 0.1
+        prior_sigma = 0.2
         lr = 0.000182
         epochs = 3306
+        # epochs = 100
     else:
         hs = [132, 77, 50]
         prior_mu = 0
-        prior_sigma = 0.1
+        prior_sigma = 0.2
         lr = 0.000423
         epochs = 3430
 
