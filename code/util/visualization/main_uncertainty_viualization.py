@@ -14,7 +14,7 @@ def main():
     np.random.seed(42)
 
     # plot styling
-    fig = plt.figure(figsize=(6, 4))
+    fig = plt.figure(figsize=(6, 5.2))
     plt.locator_params(axis='y', nbins=4)
     plt.locator_params(axis='x', nbins=6)
 
@@ -77,7 +77,7 @@ def main():
     handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, loc='lower center', ncol=6)
     plt.tight_layout()
-    plt.subplots_adjust(bottom=0.14)
+    plt.subplots_adjust(bottom=0.11, hspace=0.46)
     plt.show()
 
 
