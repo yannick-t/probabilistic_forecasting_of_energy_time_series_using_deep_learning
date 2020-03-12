@@ -5,38 +5,10 @@ from evaluation.evaluation_plot_util import plot_multiple
 import matplotlib.pyplot as plt
 import numpy as np
 
-
-def ood_timeframe_multiple(names, start_time, end_time, pred_means, pred_vars, timestamp, y_true):
-    count = len(pred_means)
-
-    def plot_fn(counter, ax):
-        name = names[counter]
-        pmean = pred_means[counter]
-        pvar = pred_vars[counter]
-
-        ax.set_title(name)
-
-        ood_timeframe(start_time, end_time, pmean, pvar, timestamp, y_true, ax)
-
-    fig = plot_multiple(plot_fn, count)
-
-    fig.text(0.016, 0.5, 'Load', va='center', rotation='vertical')
-    plt.subplots_adjust(left=0.1)
-
-
-def ood_timeframe(start_time, end_time, pred_mean, pred_var, timestamp, y_true, ax):
-    x = timestamp
-
-    ax.plot(x, y_true.squeeze(), color='lightblue', alpha=0.4)
-    ax.plot(x, pred_mean.squeeze(), color='orange')
-
-    ax.set_xlim(start_time, end_time)
-
-    # 90% conf intervals
-    conf = np.sqrt(np.sqrt(2) * erfinv(0.9) * np.sqrt(pred_var.squeeze()))
-    ax.fill_between(x, pred_mean.squeeze() - conf,
-                    pred_mean.squeeze() + conf,
-                    alpha=0.5, color='orange')
+'''
+Utility methods to evaluate the distribution of predictive standard deviations on out of distribution (o.o.d.) data
+compared to predictive standard deviations on test data.  
+'''
 
 
 def ood_sharpness_plot_histogram_joint(pred_test_var, pred_ood_var, ax):

@@ -7,6 +7,13 @@ from scipy.special import erfinv
 from models.simple_gp import ExactGPModel
 from training.training_gp import train_exact_gp
 
+
+'''
+Code to create a visualization plot to show Epistemic and Aleatoric Uncertainty types.
+Uses a simple Gaussian Process to create an Epistemic Ucneratinty estimate. 
+'''
+
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -22,8 +29,6 @@ def main():
     f = lambda x: x + np.sin(2 * (x + 0.1)) + 0.1
     dx = np.arange(0.5, 2.5, 0.001)
     dy = f(dx)
-
-
 
     # Homoscedastic aleotoric
     obs_aleo_x = np.arange(0.6, 2.5, 0.3)

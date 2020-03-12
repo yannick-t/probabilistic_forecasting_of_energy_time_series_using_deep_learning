@@ -5,6 +5,11 @@ import torchbnn as bnn
 
 from models.base_nn import BaseNN
 
+'''
+Simple boilerplate Bayesian Neural Network implementation using torchbnn.
+Supports supplying with dynamic amount of layer counts and sizes 
+'''
+
 
 class TorchBNN(BaseNN):
     def __init__(self, input_size, output_size, prior_mu, prior_sigma, **kwargs):

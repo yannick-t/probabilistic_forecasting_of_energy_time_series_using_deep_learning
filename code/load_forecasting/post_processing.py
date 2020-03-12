@@ -1,19 +1,21 @@
-from scipy import stats
 from scipy.optimize import minimize
 import numpy as np
 
-from evaluation.calibration import pit_calc
 from evaluation.scoring import crps
+
+'''
+Simple post-processing recalibration step and utility class to model the recalibration for all methods.
+'''
 
 
 def recalibrate(pred_means, pred_vars, y_true):
-    # correct over / under-dispersion and bias in a post processing step
-    # minimizing over uniform pit
+    # correct over- / underdispersion and bias in a post processing step
+    # minimize two variables over crps: x[0] adds to mean to correct bias, x[1] is a factor
+    # predictive variances are multiplied with to correct for over / underdispersion
+
     def fn(x):
         pmn = pred_means + x[0]
         pvn = pred_vars * x[1]
-        # pt = pit_calc(pmn, pvn, y_true)
-        # res = stats.kstest(pt, 'uniform').statistic
         res = crps(pmn, np.sqrt(pvn), y_true)
         return res
 

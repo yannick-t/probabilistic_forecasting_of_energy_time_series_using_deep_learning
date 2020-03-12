@@ -7,6 +7,11 @@ import statsmodels.api as sm
 from util.data.data_tools import inverse_transform_normal, inverse_transform_normal_var
 
 
+'''
+Utility methods to make predictions for all the models at the same time.
+'''
+
+
 def predict_transform_multiple(models, x_test, scaler, offset_test=None):
     pred_means = []
     pred_vars = []

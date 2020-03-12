@@ -6,6 +6,12 @@ import seaborn as sm
 
 from evaluation.evaluation_plot_util import plot_multiple
 
+'''
+Utility methods to evaluate probabilistic and marginal calibration with plots as proposed in Gneiting, T., 
+Balabdaoui, F., & Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness. Journal of the Royal 
+Statistical Society: Series B (Statistical Methodology), 69(2), 243-268. 
+'''
+
 
 def probabilistic_calibration_multiple(names, pred_y_mean, pred_y_var, y_true, pred_y_mean_comp=None, pred_y_var_comp=None):
     count = len(pred_y_mean)

@@ -1,7 +1,6 @@
-import torch
-import numpy as np
 import matplotlib.pyplot as plt
-from numpy.distutils.command.config_compiler import config_cc
+import numpy as np
+import torch
 from sklearn.preprocessing import StandardScaler
 
 from models.concrete_dropout import ConcreteDropoutNN
@@ -9,15 +8,18 @@ from models.deep_ensemble_single import DeepEnsembleSingle
 from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
-from models.simple_nn import SimpleNN
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from models.skorch_wrappers.bnn_skorch import BNNSkorch
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from models.torch_bnn import TorchBNN
-from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
+
+'''
+some code to test the combined uncertainty estimates of the models
+on a toy problem and visualizing results
+'''
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
@@ -46,8 +48,8 @@ x_train = scaler.fit_transform(x_train, y_train)
 y_train = scaler.transform(y_train)
 x_test = scaler.transform(x_test)
 
-# some code to test the combined uncertainty estimates of the models
-# on a toy problem and visualizing results
+
+
 def main():
     bayesian_nn()
 

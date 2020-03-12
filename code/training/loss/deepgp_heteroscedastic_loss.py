@@ -2,7 +2,6 @@ import torch
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.mlls import DeepApproximateMLL, VariationalELBO
 from torch import nn
-from torch.distributions import Normal
 
 
 class DeepGPHeteroscedasticLoss(nn.Module):

@@ -2,11 +2,13 @@ import os
 from datetime import datetime
 
 import pandas
-import numpy as np
 from sklearn.externals import joblib
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 from util.data.data_tools import preprocess_load_data_forec
+
+'''
+Utility methods to load, clean, select relevant information, and save clean data for load forecasting data
+'''
 
 
 def load_uci_load():

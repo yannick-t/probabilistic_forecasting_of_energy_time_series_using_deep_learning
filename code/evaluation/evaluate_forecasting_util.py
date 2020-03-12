@@ -3,15 +3,22 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.special import erfinv
 
 from evaluation.calibration import probabilistic_calibration_multiple, marginal_calibration_multiple, interval_coverage, \
     probabilistic_calibration, marginal_calibration
-from evaluation.ood import ood_timeframe_multiple, ood_sharpness_plot_histogram_joint, \
+from evaluation.evaluation_plot_util import plot_multiple
+from evaluation.ood import ood_sharpness_plot_histogram_joint, \
     ood_sharpness_plot_histogram_joint_multiple
 from evaluation.scoring import rmse, mape, crps, log_likelihood
 from evaluation.sharpness import sharpness_plot_multiple, sharpness_avg_width, \
     sharpness_plot
 from util.model_enum import ModelEnum
+
+'''
+Utility methods to evaluate the results for multiple methods at once in terms of Epistemic Uncertainty (with o.o.d. data), 
+calibration, and sharpness
+'''
 
 # pretty names for plot titles etc.
 names_pretty_dict = {ModelEnum.simple_nn_aleo.name: 'Simple NN', ModelEnum.concrete.name: 'Concrete',
@@ -29,11 +36,6 @@ def evaluate_ood_multiple(names, pred_means, pred_vars, y_true_orig, timestamp, 
     for counter, p_ood in enumerate(pred_ood_vars):
         ood_sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
         plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
-
-    # timeframe with large prediction errors
-    # ood_timeframe_multiple(names_pretty, datetime(year=2018, month=10, day=2), datetime(year=2018, month=10, day=4), pred_means, pred_vars,
-    #                        timestamp, y_true_orig)
-    # plt.savefig(result_folder + result_prefix + 'timeframe_ood' + '.pdf')
 
     plt.show()
 
@@ -165,3 +167,36 @@ def plot_test_data(pred_mean, pred_var, y_true, timestamp, ax):
             ax.fill_between(x, pred_mean.squeeze() - j / 2 * std_deviations,
                             pred_mean.squeeze() + j / 2 * std_deviations,
                             alpha=0.1, color='orange')
+
+
+def timeframe_multiple(names, start_time, end_time, pred_means, pred_vars, timestamp, y_true):
+    count = len(pred_means)
+
+    def plot_fn(counter, ax):
+        name = names[counter]
+        pmean = pred_means[counter]
+        pvar = pred_vars[counter]
+
+        ax.set_title(name)
+
+        timeframe(start_time, end_time, pmean, pvar, timestamp, y_true, ax)
+
+    fig = plot_multiple(plot_fn, count)
+
+    fig.text(0.016, 0.5, 'Load', va='center', rotation='vertical')
+    plt.subplots_adjust(left=0.1)
+
+
+def timeframe(start_time, end_time, pred_mean, pred_var, timestamp, y_true, ax):
+    x = timestamp
+
+    ax.plot(x, y_true.squeeze(), color='lightblue', alpha=0.4)
+    # ax.plot(x, pred_mean.squeeze(), color='orange')
+
+    ax.set_xlim(start_time, end_time)
+
+    # 90% conf intervals
+    conf = np.sqrt(np.sqrt(2) * erfinv(0.9) * np.sqrt(pred_var.squeeze()))
+    ax.fill_between(x, pred_mean.squeeze() - conf,
+                    pred_mean.squeeze() + conf,
+                    alpha=0.5, color='orange')
