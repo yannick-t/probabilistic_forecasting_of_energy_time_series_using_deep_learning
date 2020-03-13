@@ -1,12 +1,14 @@
-# single nn to use as one of many in Deep Ensemble
-#  Implentation of concepts from Lakshminarayanan, B., Pritzel, A., & Blundell, C. (2017).
-# Simple and scalable predictive uncertainty estimation using deep ensembles.
-# In Advances in neural information processing systems (pp. 6402-6413).
-
 import torch
 import torch.nn as nn
 
 from models.base_nn import BaseNN
+
+'''
+single nn to use as one of many in Deep Ensemble
+Implementation of concepts from Lakshminarayanan, B., Pritzel, A., & Blundell, C. (2017).
+Simple and scalable predictive uncertainty estimation using deep ensembles.
+In Advances in neural information processing systems (pp. 6402-6413).
+'''
 
 
 class DeepEnsembleSingle(BaseNN):

@@ -24,12 +24,11 @@
 # SOFTWARE.
 
 import gpytorch
-from gpytorch.distributions import MultivariateNormal, MultitaskMultivariateNormal
-from gpytorch.kernels import ScaleKernel, RBFKernel
-from gpytorch.likelihoods import GaussianLikelihood
-from gpytorch.means import ConstantMean, LinearMean
-from gpytorch.models.deep_gps import AbstractDeepGPLayer, AbstractDeepGP, DeepLikelihood, DeepGPLayer, DeepGP
 import torch
+from gpytorch.distributions import MultivariateNormal
+from gpytorch.kernels import ScaleKernel, RBFKernel
+from gpytorch.means import ConstantMean, LinearMean
+from gpytorch.models.deep_gps import DeepGPLayer, DeepGP
 from gpytorch.variational import CholeskyVariationalDistribution, VariationalStrategy
 from torch import nn
 from torch.nn import Linear

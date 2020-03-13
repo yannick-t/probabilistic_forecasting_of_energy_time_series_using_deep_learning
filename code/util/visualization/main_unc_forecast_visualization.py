@@ -1,21 +1,19 @@
+from datetime import datetime
+
+import matplotlib.pyplot as plt
 import torch
 
-from evaluation.evaluate_forecasting_util import evaluate_single
+from evaluation.evaluate_forecasting_util import timeframe
 from load_forecasting.forecast_util import dataset_df_to_np
 from load_forecasting.post_processing import recalibrate
 from load_forecasting.predict import predict_transform
 from models.deep_ensemble_sklearn import DeepEnsemble
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
 from training.training_util import load_train
-from util.data.data_src_tools import load_uci_load
-from util.data.data_tools import preprocess_load_data_forec
-import workalendar.europe as wk
+from util.data.data_src_tools import load_opsd_de_load_dataset
 
 '''
-Main class for using single method with UCI data, needs uci dat in folder containing the project
-(LD2011_2014.txt) (https://archive.ics.uci.edu/ml/datasets/ElectricityLoadDiagrams20112014).
-
-Results not used in thesis!
+Code to visualize an uncertain forecast on the opsd data, by plotting one week of forecasts.
 '''
 
 use_cuda = True
@@ -25,14 +23,12 @@ device = torch.device('cuda' if use_cuda else 'cpu')
 
 
 def main():
-    # load and pre process data
-    load_df = load_uci_load()
-
-    calendars = [wk.Portugal()]
-    train_df, test_df, scaler = preprocess_load_data_forec(load_df, short_term=False, quarter_hour=True, n_ahead=1, calendars=calendars)
+    train_df, test_df, scaler = load_opsd_de_load_dataset('transparency', short_term=False, reprocess=False,
+                                                          n_ahead=1)
 
     x_train, y_train, offset_train = dataset_df_to_np(train_df)
     x_test, y_test, offset_test = dataset_df_to_np(test_df)
+    timestamp_test = test_df.index.to_numpy()
 
     y_test_orig = scaler.inverse_transform(y_test) + offset_test
     y_train_orig = scaler.inverse_transform(y_train) + offset_train
@@ -40,7 +36,6 @@ def main():
     hs = [132, 77, 50]
     lr = 5.026e-05
     epochs = 1253
-    # epochs = 100
 
     # initialize model
     ensemble_model = DeepEnsemble(
@@ -56,17 +51,20 @@ def main():
     )
 
     # train and recalibrate
-    load_train(ensemble_model, x_train, y_train, 'deep_ens', '../trained_models/', 'uci_load_forecasting_', False)
+    load_train(ensemble_model, x_train, y_train, 'deep_ens', '../trained_models/', 'load_forecasting_', True)
 
-    pred_mean_train, pred_var_train, _, _, _ = predict_transform(ensemble_model, x_train, scaler, offset_train, 'Deep Ensemble UCI')
+    pred_mean_train, pred_var_train, _, _, _ = predict_transform(ensemble_model, x_train, scaler, offset_train,
+                                                                 'Deep Ensemble')
     recal = recalibrate(pred_mean_train, pred_var_train, y_train_orig)
 
     # predict
     pred_mean, pred_var, _, _, _ = predict_transform(ensemble_model, x_test, scaler, offset_test, 'Deep Ensemble UCI')
     pred_mean, pred_var = recal(pred_mean, pred_var)
 
-    # evaluate
-    evaluate_single(pred_mean, pred_var, y_test_orig)
+    ax = plt.subplot(1, 1, 1)
+    timeframe(datetime(2018, month=7, day=9), datetime(2018, month=7, day=16), pred_mean, pred_var, timestamp_test,
+              y_test_orig, ax)
+    plt.show()
 
 
 if __name__ == '__main__':

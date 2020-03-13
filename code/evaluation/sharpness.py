@@ -4,6 +4,12 @@ from scipy.special import erfinv
 import numpy as np
 import pandas as pd
 
+'''
+Utility methods to evaluate sharpness with plots and average interval widths as proposed in Gneiting, T., 
+Balabdaoui, F., & Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness. Journal of the Royal 
+Statistical Society: Series B (Statistical Methodology), 69(2), 243-268. 
+'''
+
 
 def sharpness_plot_multiple(names, pred_y_var):
     fig, ax = plt.subplots(figsize=(6, 3.0))
@@ -56,6 +62,8 @@ def sharpness_plot_(pred_y_var, ax, names=None):
     # "Gneiting, T., Balabdaoui, F., & Raftery, A. E. (2007). Probabilistic forecasts, calibration and sharpness.
     # Journal of the Royal Statistical Society: Series B (Statistical Methodology), 69(2), 243-268.")
     sns.boxplot(x='Quantile', y='Width', hue='Method', data=widths, whis=[5, 95], ax=ax, showfliers=False)
+    ax.set_xticklabels([])
+    ax.set_xlabel('')
 
     ax.set_xlim(left=-0.8)
 

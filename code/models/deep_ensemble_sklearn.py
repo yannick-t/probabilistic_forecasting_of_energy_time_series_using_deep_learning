@@ -1,13 +1,9 @@
-# Implentation of concepts from Lakshminarayanan, B., Pritzel, A., & Blundell, C. (2017).
-# Simple and scalable predictive uncertainty estimation using deep ensembles.
-# In Advances in neural information processing systems (pp. 6402-6413).
-# using a custom sklean estimator to train an ensemble of neural nets
 import multiprocessing
 
 import sklearn
 import numpy as np
 import torch
-from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+from sklearn.utils.validation import check_array
 from sklearn.base import RegressorMixin
 from multiprocessing import Pool
 
@@ -15,6 +11,13 @@ from models.base_nn import hidden_size_extract
 from models.deep_ensemble_single import DeepEnsembleSingle
 from models.skorch_wrappers.combined_unc_nn_skorch import combine_uncertainties
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
+
+'''
+Implementation of concepts from Lakshminarayanan, B., Pritzel, A., & Blundell, C. (2017).
+Simple and scalable predictive uncertainty estimation using deep ensembles.
+In Advances in neural information processing systems (pp. 6402-6413).
+using a custom sklean estimator to train an ensemble of neural nets
+'''
 
 
 class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
@@ -61,6 +64,7 @@ class DeepEnsemble(sklearn.base.BaseEstimator, RegressorMixin):
         # according to original paper
         args = [(model, X, y) for model in self.models]
 
+        # train in parallel for best performance
         multiprocessing.set_start_method('spawn', force=True)
 
         if self.parallel:

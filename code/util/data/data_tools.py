@@ -2,12 +2,14 @@ from datetime import timedelta
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
 import workalendar.europe.germany as wk
-from statsmodels.tsa.api import ExponentialSmoothing, STL, seasonal_decompose
-import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from statsmodels.tsa.api import ExponentialSmoothing, seasonal_decompose
+
+'''
+Utility methods to pre-process, transform, and generate the data used for forecasting. 
+'''
 
 
 def gen_synth_ood_data_like(test_df, short_term=True, seed=333, min_variation=0, max_variation=3):
@@ -28,10 +30,13 @@ def gen_synth_ood_data_like(test_df, short_term=True, seed=333, min_variation=0,
 
 
 def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, scaler=None, n_ahead=1, calendars=None):
+    # pre-process load data for forecasting: scale, split in train / test, de-seasonalize, and construct features
+    # expects pandas Dataframe with a Datetimeindex and a load column containing the load data in MW with no missing
+    # values.
+    # Resolution either quarter hour (quarter_hour=True), if quarter_hour=False assumed to be hourly data
+
     # use GW for convenience and readability later, also the standard-scaled values are smaller
     dataframe = dataframe / 1000
-
-
 
     # split data first so scaler and deseasonilizing can be trained on train set properly
     train_df_o, test_df_o = train_test_split(dataframe, test_size=0.2, shuffle=False)
@@ -74,7 +79,8 @@ def preprocess_load_data_forec(dataframe, quarter_hour=True, short_term=True, sc
 
 
 def construct_features(dataframe, offset, calendars=None, short_term=True, quarter_hour=True, n_ahead=1):
-    # pre process, define features for forecasting
+    # pre process:
+    # construct the features for forecasting based on the given data
 
     if calendars is None:
         # calendars to be used for holiday encoding, complete Germany

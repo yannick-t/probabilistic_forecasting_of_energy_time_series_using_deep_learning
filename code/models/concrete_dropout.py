@@ -99,10 +99,6 @@ class ConcreteDropoutNN(BaseNN):
 
         self.act = nn.ReLU()
 
-        # nn.init.xavier_uniform_(self.linear1.weight)
-        # for fc in self.linears:
-        #     nn.init.xavier_uniform_(fc.weight)
-
     def forward(self, x):
         regularization = torch.empty(len(self.hidden_size), device=x.device)
 

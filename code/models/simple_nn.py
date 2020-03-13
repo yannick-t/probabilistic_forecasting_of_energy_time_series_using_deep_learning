@@ -3,6 +3,11 @@ import torch.nn as nn
 
 from models.base_nn import BaseNN
 
+'''
+Simple boilerplate Neural Network implementation using PyTorch.
+Supports supplying with dynamic amount of layer counts and sizes 
+'''
+
 
 class SimpleNN(BaseNN):
     def __init__(self, input_size, output_size, dropout_prob=0, **kwargs):

@@ -1,5 +1,6 @@
 import os
 import time
+from operator import itemgetter
 
 import matplotlib.pyplot as plt
 
@@ -35,6 +36,13 @@ from util.data.data_src_tools import load_opsd_de_load_dataset
 from util.data.data_tools import gen_synth_ood_data_like
 from util.model_enum import ModelEnum
 
+'''
+Main file for running and evaluating probabilistic forecasting of multiple models for a short-term and a day-ahead 
+scenario using Open Power Systems Data.
+
+Mostly utility code to configure, load, train, and evaluate all the models using the skorch wrappers defined in models/skorch_wrappers.
+'''
+
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
 
@@ -47,17 +55,18 @@ def main():
     prefix = 'load_forecasting_'
     result_folder = '../results/'
 
+    # Models to be loaded or trained and evaluated, chosen via an enumeration
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
               ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
     # models = [ModelEnum.deep_ens]
     # models = [ModelEnum.bnn]
 
-    # Forecasting case with short term lagged vars
+    # Forecasting case with short term lagged vars (short-term forecasting)
     evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=True)
-    # Forecasting case without short term lagged vars
+                    generate_plots=True, save_res=False, recalibrate=False, eval_ood=True)
+    # Forecasting case without short term lagged vars (day-ahead forecasting)
     evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=False, recalibrate=True, eval_ood=False)
+                    generate_plots=True, save_res=False, recalibrate=False, eval_ood=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
@@ -121,7 +130,7 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
         # random data to serve as out of distribution data
         # to test epistemic unc. capabilities of models
         x_oods = generate_ood_data(test_df, x_test, short_term)
-        (pred_ood_means, pred_ood_vars) = zip(*[models_predict_transform(models, x_ood, scaler)[0: 2] for x_ood in x_oods])
+        (pred_ood_means, pred_ood_vars) = zip(*[itemgetter(0, 1)(models_predict_transform(models, x_ood, scaler)) for x_ood in x_oods])
 
         if recalibrate:
             pred_ood_vars = [models_post_process(pred_ood_m, pred_ood_v, recalibrators)[1] for pred_ood_m, pred_ood_v in
@@ -256,14 +265,8 @@ def generate_ood_data(test_df, x_test, short_term):
     ood_0_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=322, min_variation=2, max_variation=3)
     x_ood_0, _, _ = dataset_df_to_np(ood_0_df)
     x_oods.append(x_ood_0)
-    # # very differenct ranges
-    # ood_1_df = gen_synth_ood_data_like(test_df, short_term=short_term, seed=42, variation=4)
-    # x_ood_1, _, _ = dataset_df_to_np(ood_1_df)
-    # x_oods.append(x_ood_1)
-    # completely random (including indicator variables)
-    # np.random.seed(492)
-    # x_ood_2 = np.random.uniform(-10, 10, size=x_test.shape)
-    # x_oods.append(x_ood_2)
+
+    # more data can be added here for automatic ood evaluation
 
     return x_oods
 
@@ -375,9 +378,10 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
     if short_term:
         hs = [24, 64, 32]
         prior_mu = 0
-        prior_sigma = 0.1
+        prior_sigma = 0.2
         lr = 0.000182
         epochs = 3306
+        # epochs = 100
     else:
         hs = [132, 77, 50]
         prior_mu = 0

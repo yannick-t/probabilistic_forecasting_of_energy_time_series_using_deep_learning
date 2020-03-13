@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import math
 
 
+# simple utility method to plot multiple plots
 def plot_multiple(plot_fn, count, max_columns=4, sharey='all'):
     rows = math.ceil(count / max_columns)
     fig, axes = plt.subplots(rows, min(count, max_columns), sharey=sharey, figsize=(6, rows * 1.8))

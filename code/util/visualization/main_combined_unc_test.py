@@ -1,22 +1,25 @@
-import torch
-import numpy as np
 import matplotlib.pyplot as plt
-from numpy.distutils.command.config_compiler import config_cc
+import numpy as np
+import torch
+from sklearn.preprocessing import StandardScaler
 
 from models.concrete_dropout import ConcreteDropoutNN
 from models.deep_ensemble_single import DeepEnsembleSingle
 from models.deep_ensemble_sklearn import DeepEnsemble
 from models.deep_gp import DeepGaussianProcess
 from models.functional_np import RegressionFNP
-from models.simple_nn import SimpleNN
 from models.skorch_wrappers.base_nn_skorch import BaseNNSkorch
 from models.skorch_wrappers.bnn_skorch import BNNSkorch
 from models.skorch_wrappers.concrete_skorch import ConcreteSkorch
 from models.skorch_wrappers.deep_gp_skorch import DeepGPSkorch
 from models.skorch_wrappers.functional_np_skorch import RegressionFNPSkorch
 from models.torch_bnn import TorchBNN
-from training.loss.crps_loss import CRPSLoss
 from training.loss.heteroscedastic_loss import HeteroscedasticLoss
+
+'''
+some code to test the combined uncertainty estimates of the models
+on a toy problem and visualizing results
+'''
 
 use_cuda = True
 use_cuda = use_cuda & torch.cuda.is_available()
@@ -40,11 +43,15 @@ y_train = np.expand_dims(obs_aleo_het_y.reshape([-1]), 1)
 x_train = np.expand_dims(np.repeat(obs_aleo_x, sec_dim), 1)
 x_test = np.expand_dims(dx_test, 1)
 
+scaler = StandardScaler()
+x_train = scaler.fit_transform(x_train, y_train)
+y_train = scaler.transform(y_train)
+x_test = scaler.transform(x_test)
 
-# some code to test the combined uncertainty estimates of the models
-# on a toy problem and visualizing results
+
+
 def main():
-    deep_gp()
+    bayesian_nn()
 
 
 def bayesian_nn():
@@ -53,10 +60,10 @@ def bayesian_nn():
                     module__output_size=y_train.shape[-1] * 2,
                     module__hidden_size=[16],
                     module__prior_mu=0,
-                    module__prior_sigma=0.1,
+                    module__prior_sigma=0.6,
                     sample_count=30,
                     lr=0.001,
-                    max_epochs=10000,
+                    max_epochs=1000,
                     train_split=None,
                     batch_size=1024,
                     optimizer=torch.optim.Adam,
