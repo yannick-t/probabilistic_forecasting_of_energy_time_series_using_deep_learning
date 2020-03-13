@@ -58,15 +58,13 @@ def main():
     # Models to be loaded or trained and evaluated, chosen via an enumeration
     models = [ModelEnum.quantile_reg, ModelEnum.simple_nn_aleo, ModelEnum.concrete, ModelEnum.fnp,
               ModelEnum.deep_ens, ModelEnum.bnn, ModelEnum.dgp]
-    # models = [ModelEnum.deep_ens]
-    # models = [ModelEnum.bnn]
 
     # Forecasting case with short term lagged vars (short-term forecasting)
     evaluate_models(model_folder, prefix, result_folder, short_term=True, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=False, recalibrate=False, eval_ood=True)
+                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=True)
     # Forecasting case without short term lagged vars (day-ahead forecasting)
     evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=False, recalibrate=False, eval_ood=False)
+                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=True)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,
@@ -378,14 +376,14 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
     if short_term:
         hs = [24, 64, 32]
         prior_mu = 0
-        prior_sigma = 0.2
+        prior_sigma = 0.1
         lr = 0.000182
         epochs = 3306
         # epochs = 100
     else:
         hs = [132, 77, 50]
         prior_mu = 0
-        prior_sigma = 0.2
+        prior_sigma = 0.161
         lr = 0.000423
         epochs = 6500
 
