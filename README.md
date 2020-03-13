@@ -23,7 +23,7 @@ The name of the environment is probForecETS and should be used to execute the co
 This software uses data from Open Power Systems Data, because of licensing reasons we refrained from adding this data to the repository. To use it the *time_series_15min_singleindex.csv* from [https://doi.org/10.25832/time_series/2019-06-05](https://doi.org/10.25832/time_series/2019-06-05) needs to be placed in the folder containing the repository data.
 
 ### Load Forecasting
-the main files for the load forecasting scenario from the thesis can be found in code/load_forecasting. To execute them the working directory must be the *code* directory. *main_opsd_all.py* loads and evaluates the trained models on the data and save the results in the results folder. *main_opsd_optimization.py* is utility code used for hyper-parameter optimization of the methods (not fully automatic).
+the main files for the load forecasting scenario from the thesis can be found in code/load_forecasting. To execute them the working directory must be the *code* directory. *main_opsd_all.py* loads and evaluates the trained models on the data and save the results in the results folder (will replace files already saved). *main_opsd_optimization.py* is utility code used for hyper-parameter optimization of the methods (not fully automatic).
 
 ## Structure
 The model code can be found in *code/models* as well as some wrappers used to incorporate the PyTorch code with scikit-learn and scikit-optimize. The trained models are located under *trained_models* and can be loaded via the skorch wrappers as it is done in *code/load_forecasting/main_opsd_all.py*.
