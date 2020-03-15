@@ -64,7 +64,7 @@ def main():
                     generate_plots=True, save_res=True, recalibrate=True, eval_ood=True)
     # Forecasting case without short term lagged vars (day-ahead forecasting)
     evaluate_models(model_folder, prefix, result_folder, short_term=False, model_names=models, load_saved_models=True,
-                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=True)
+                    generate_plots=True, save_res=True, recalibrate=True, eval_ood=False)
 
 
 def evaluate_models(model_folder, prefix, result_folder, short_term, model_names=None, load_saved_models=False,

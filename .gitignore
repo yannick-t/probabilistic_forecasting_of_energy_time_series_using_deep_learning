@@ -1,6 +1,7 @@
 # data
 de_load_*
 uci_load_15_clean*
+opsd_de_load_transparency_15_clean*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
