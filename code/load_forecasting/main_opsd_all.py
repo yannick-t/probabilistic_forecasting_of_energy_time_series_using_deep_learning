@@ -385,7 +385,7 @@ def bnn_init(x_train, y_train, short_term, crps_loss=False):
         prior_mu = 0
         prior_sigma = 0.161
         lr = 0.000423
-        epochs = 6500
+        epochs = 3500
 
     bnn = BNNSkorch(
         module=TorchBNN,
