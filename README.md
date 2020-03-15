@@ -40,7 +40,7 @@ cd code
 ```
 for Linux:
 ```
-PYTHONPATH=./ python /load_forecasting/main_opsd_all.py
+PYTHONPATH=./ python load_forecasting/main_opsd_all.py
 ```
 for Windows:
 ```
