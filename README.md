@@ -1,5 +1,6 @@
 # Probabilistic Forecasting of Energy Time Series Using Deep Learning
 Repository for master's thesis "Probabilistic Forecasting of Energy Time Series Using Deep Learning".
+The thesis can be found [here](./thesis.pdf).
 
 Copyright and Licence information for the code adapted from other sources can be found in the respective files as comments.
 
@@ -27,7 +28,7 @@ conda activate probForecETS
 This software uses data from Open Power Systems Data, because of licensing reasons we refrained from adding this data to the repository. To use it, the **time_series_15min_singleindex.csv** from [https://doi.org/10.25832/time_series/2019-06-05](https://doi.org/10.25832/time_series/2019-06-05) needs to be placed in the folder containing the repository data.
 
 Resulting in the following folder structure:
-- \
+- /
   - probabilistic_forecasting_of_energy_time_series_using_deep_learning
   - time_series_15min_singleindex.csv
 
