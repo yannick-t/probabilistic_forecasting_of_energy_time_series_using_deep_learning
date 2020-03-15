@@ -37,8 +37,6 @@ def evaluate_ood_multiple(names, pred_means, pred_vars, y_true_orig, timestamp, 
         ood_sharpness_plot_histogram_joint_multiple(names_pretty, pred_vars, p_ood)
         plt.savefig(result_folder + result_prefix + 'sharpness_ood' + str(counter) + '.pdf')
 
-    plt.show()
-
 
 def evaluate_multiple(names, pred_means, pred_vars, pred_means_pit_comp, pred_vars_pit_comp, true_y, result_folder, result_prefix, generate_plots=True):
     names_pretty = [names_pretty_dict[name] for name in names]
@@ -57,8 +55,6 @@ def evaluate_multiple(names, pred_means, pred_vars, pred_means_pit_comp, pred_va
         # sharpness
         sharpness_plot_multiple(names_pretty, pred_vars)
         plt.savefig(result_folder + result_prefix + 'calibration_sharpness.pdf')
-
-        plt.show()
 
     scores = pd.DataFrame(index=names, columns=['90IntCov', '50IntCov', 'AvgCent50W', 'AvgCent90W', 'RMSE', 'MAPE',
                                                 'CRPS', 'AVGNLL'])

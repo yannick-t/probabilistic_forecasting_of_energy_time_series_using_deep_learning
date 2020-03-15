@@ -1,5 +1,5 @@
 # Probabilistic Forecasting of Energy Time Series Using Deep Learning
-Repository for master's thesis "Probabilistic Forecasting of Energy Time Series Using Deep Learning" by Yannick Tanner.
+Repository for master's thesis "Probabilistic Forecasting of Energy Time Series Using Deep Learning".
 
 Copyright and Licence information for the code adapted from other sources can be found in the respective files as comments.
 
@@ -13,17 +13,40 @@ Overall, the methods perform well, with Concrete Dropout, Deep Ensembles, and Ba
 ## Usage
 The code for the application is located in *code* and is written in Python.
 ### Environment
-In the code folder there is an anaconda ([anaconda.com](https://www.anaconda.com/)) environment file that contains the dependencies for the project. It can be created via
+In the code folder there is an anaconda ([anaconda.com](https://www.anaconda.com/)) environment file that contains the dependencies for the project. It can be created via (assuming the user is in the repository main directory)
 ```
-conda env create -f environment.yml
+conda env create -f code/environment.yml
 ```
 The name of the environment is probForecETS and should be used to execute the code of this repository in.
+Activate the environment with
+```
+conda activate probForecETS
+```
 
 ### Data
-This software uses data from Open Power Systems Data, because of licensing reasons we refrained from adding this data to the repository. To use it, the *time_series_15min_singleindex.csv* from [https://doi.org/10.25832/time_series/2019-06-05](https://doi.org/10.25832/time_series/2019-06-05) needs to be placed in the folder containing the repository data.
+This software uses data from Open Power Systems Data, because of licensing reasons we refrained from adding this data to the repository. To use it, the **time_series_15min_singleindex.csv** from [https://doi.org/10.25832/time_series/2019-06-05](https://doi.org/10.25832/time_series/2019-06-05) needs to be placed in the folder containing the repository data.
+
+Resulting in the following folder structure:
+- \
+  - probabilistic_forecasting_of_energy_time_series_using_deep_learning
+  - time_series_15min_singleindex.csv
 
 ### Load Forecasting
 the main files for the load forecasting scenario from the thesis can be found in code/load_forecasting. To execute them the working directory must be the *code* directory. *main_opsd_all.py* loads and evaluates the trained models on the data and saves the results in the results folder (will replace files already saved). By default this will recalibrate the models, to modify behavior the *main* method in *main_opsd_all.py* can be modified accordingly. (Note that Functional Neural Processes need a considerable amount of memory, in particular to recalibrate the day-ahead forecasting scenario. They can fail when running out of memory.)
+
+Run with 
+```
+cd code
+```
+for Linux:
+```
+PYTHONPATH=./ python /load_forecasting/main_opsd_all.py
+```
+for Windows:
+```
+set PYTHONPATH=./ && python load_forecasting/main_opsd_all.py
+```
+Or by using an IDE and configuring it to run *main_opsd_all.py* using code/ as the working directory and probForecETS as the conda environment (if supported otherwise with the python interpreter set to the one from the probForecETS environment).
 
 *main_opsd_optimization.py* is utility code used for hyper-parameter optimization of the methods (not fully automatic).
 
