@@ -34,7 +34,7 @@ Resulting in the following folder structure:
 ### Load Forecasting
 the main files for the load forecasting scenario from the thesis can be found in code/load_forecasting. To execute them the working directory must be the *code* directory. *main_opsd_all.py* loads and evaluates the trained models on the data and saves the results in the results folder (will replace files already saved). By default this will recalibrate the models, to modify behavior the *main* method in *main_opsd_all.py* can be modified accordingly. (Note that Functional Neural Processes need a considerable amount of memory, in particular to recalibrate the day-ahead forecasting scenario. They can fail when running out of memory.)
 
-Run with 
+Run by switching to the code directory, setting the PYTHONPATH, and calling the interpreter with the main file: (assuming the conda environment was activated)
 ```
 cd code
 ```
