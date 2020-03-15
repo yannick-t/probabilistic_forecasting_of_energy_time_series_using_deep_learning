@@ -4,7 +4,9 @@ Repository for master's thesis "Probabilistic Forecasting of Energy Time Series 
 Copyright and Licence information for the code adapted from other sources can be found in the respective files as comments.
 
 ## Abstract
-This thesis explores probabilistic extensions to Deep Learning and their application in forecasting of energy time series. The methods tested are Concrete Dropout, Deep Ensembles, Bayesian Neural Networks, Deep Gaussian Processes, and Functional Neural Processes.
+Deep Learning methods are widely successful and continue to be applied in new fields, one of them being forecasting of energy time series. However, they lack an indication of their confidence in predictions, which helps evaluate, interpret, and improve forecasters.
+
+Therefore, this thesis explores probabilistic extensions to Deep Learning and their application in forecasting of energy time series. The methods tested are Concrete Dropout, Deep Ensembles, Bayesian Neural Networks, Deep Gaussian Processes, and Functional Neural Processes.
 
 For evaluation, two load forecasting scenarios are considered: Short-Term (single-step) and day-ahead (multi-step) forecasting. The methods are evaluated in terms of calibration, sharpness, and how well they indicate a lack of knowledge (Epistemic Uncertainty). As reference a simple Neural Network and a Quantile Regression model are used.
 
