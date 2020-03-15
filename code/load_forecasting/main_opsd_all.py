@@ -79,6 +79,8 @@ def evaluate_models(model_folder, prefix, result_folder, short_term, model_names
     if crps_loss:
         prefix = prefix + 'crps_'
 
+    print('Evaluating: ' + prefix)
+
     if model_names is not None:
         plot_prefix = prefix + '_'.join([m.name for m in model_names]) + '_'
     else:
@@ -213,6 +215,7 @@ def models_predict_transform(models, x_test, scaler, offset_test=None):
 
 
 def models_recalibrate(models, x_train, y_train_orig, scaler, offset_train):
+    print('Recalibrating Models')
     recals = []
 
     for k in models.keys():
@@ -230,6 +233,7 @@ def models_post_process(pred_means, pred_vars, post_processors):
 
 
 def save_results(predict_time_df, score_df, result_folder, result_prefix, train_time_df=None):
+    print('Saving Results')
     # convert times
     if train_time_df is not None:
         train_time_df.loc[:, 'train_time'] = train_time_df.loc[:, 'train_time'] / (1e9 * 60)  # nanosecods to minutes
@@ -241,7 +245,7 @@ def save_results(predict_time_df, score_df, result_folder, result_prefix, train_
         result_df = pd.read_csv(path, index_col=0)
 
         if train_time_df is not None:
-            new_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1)
+            new_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1, sort=True)
         else:
             new_df = pd.concat([predict_time_df, score_df], axis=1)
 
@@ -251,7 +255,7 @@ def save_results(predict_time_df, score_df, result_folder, result_prefix, train_
         if train_time_df is None:
             print('No train time available to save, will be nan')
             train_time_df = pd.DataFrame(np.nan, index=predict_time_df.index, columns='train_time')
-        result_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1)
+        result_df = pd.concat([train_time_df, predict_time_df, score_df], axis=1, sort=True)
 
     # save result csv
     result_df.to_csv(result_folder + result_prefix + 'results.csv', index_label='method')
@@ -500,7 +504,6 @@ def concrete_init(x_train, y_train, short_term, crps_loss=False):
         hs = [24, 64, 32]
         lr = 0.00051
         epochs = 3400
-        # epochs = 50
         lengthscale = 1e-4
         tau = 2e-3
     else:
